@@ -39,9 +39,7 @@ public class AuthServiceImpl implements AuthService {
         if (userRepository.existsByUsername(request.getUsername())) {
             throw new IllegalArgumentException("Username already exists");
         }
-
         Role role = request.getRole() != null ? request.getRole() : Role.ROLE_USER;
-
         User user = User.builder()
                 .username(request.getUsername())
                 .password(passwordEncoder.encode(request.getPassword()))
@@ -53,22 +51,31 @@ public class AuthServiceImpl implements AuthService {
 
 
     @Override
-    public AuthResponse login(LoginRequest request) {
-        try {
-            Authentication auth = authManager.authenticate(
-                    new UsernamePasswordAuthenticationToken(
-                            request.getUsername(), request.getPassword()
-                    )
-            );
-            // Dùng kết quả xác thực
-            String username = auth.getName(); // hoặc ((UserDetails) auth.getPrincipal()).getUsername()
+public AuthResponse login(LoginRequest request) {
+    try {
+        Authentication auth = authManager.authenticate(
+                new UsernamePasswordAuthenticationToken(
+                        request.getUsername(), request.getPassword()
+                )
+        );
 
-            String token = jwtService.generateToken(username, Collections.emptyMap());
-            return new AuthResponse(token);
-        } catch (Exception ex) {
-            throw new BadCredentialsException("Invalid username or password");
-        }
+        // Lấy user đầy đủ từ DB để đọc role
+        User user = userRepository.findByUsername(request.getUsername())
+                .orElseThrow(() -> new BadCredentialsException("Invalid username or password"));
+
+        // Thêm claim role vào JWT
+        String token = jwtService.generateToken(
+                user.getUsername(),
+                Map.of("role", user.getRole().name())
+        );
+
+        return new AuthResponse(token);
+
+    } catch (Exception ex) {
+        throw new BadCredentialsException("Invalid username or password");
     }
+}
+
 }
 
 

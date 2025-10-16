@@ -1,4 +1,4 @@
-package com.r2s.user.user_service;
+package com.r2s.user;
 
 import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
