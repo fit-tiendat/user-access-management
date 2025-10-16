@@ -59,4 +59,9 @@ public class JwtService {
                 .setSigningKey(key)
                 .build().parseClaimsJws(token);
     }
+    public String extractRole(String token) {
+        Object role = parse(token).getBody().get("role");
+        return role == null ? null : role.toString();
+    }
+
 }

@@ -39,10 +39,11 @@ public class AuthServiceImpl implements AuthService {
         if (userRepository.existsByUsername(request.getUsername())) {
             throw new IllegalArgumentException("Username already exists");
         }
+        Role role = request.getRole() != null ? request.getRole() : Role.ROLE_USER;
         User user = User.builder()
                 .username(request.getUsername())
                 .password(passwordEncoder.encode(request.getPassword()))
-                .role(Role.ROLE_USER)
+                .role(role)
                 .build();
 
         userRepository.save(user);
@@ -64,7 +65,11 @@ public class AuthServiceImpl implements AuthService {
         User user = userRepository.findByUsername(request.getUsername())
                 .orElseThrow(() -> new BadCredentialsException("Invalid username or password"));
 
-        String token = jwtService.generateToken(user.getUsername(),Collections.emptyMap() );
+        String token = jwtService.generateToken(
+                user.getUsername()
+                , Map.of("role", user.getRole().name() )
+        );
+
         return new AuthResponse(token);
     }
 }
