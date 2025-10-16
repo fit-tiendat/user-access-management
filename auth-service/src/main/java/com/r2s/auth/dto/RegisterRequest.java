@@ -16,12 +16,12 @@ public class RegisterRequest {
     @Size(min = 6, max = 100)
     private String password;
 
-    @NotBlank @Email
-    private String email;
-
-    @NotBlank
-    private String fullName;
-
-    // Optional: allow choosing role; default USER if null
-    private Role role;
+//    @NotBlank @Email
+//    private String email;
+//
+//    @NotBlank
+//    private String fullName;
+//
+//    // Optional: allow choosing role; default USER if null
+//    private Role role;
 }
