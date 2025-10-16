@@ -8,6 +8,6 @@ import com.r2s.auth.entity.User;
 
 
 public interface AuthService {
-    User register(RegisterRequest request);
+    void register(RegisterRequest request);
     AuthResponse login(LoginRequest request);
 }
