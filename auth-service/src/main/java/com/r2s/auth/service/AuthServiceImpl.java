@@ -51,58 +51,32 @@ public class AuthServiceImpl implements AuthService {
 
 
     @Override
-public AuthResponse login(LoginRequest request) {
-    try {
-        Authentication auth = authManager.authenticate(
-                new UsernamePasswordAuthenticationToken(
-                        request.getUsername(), request.getPassword()
-                )
-        );
+    public AuthResponse login(LoginRequest request) {
+        try {
+            Authentication auth = authManager.authenticate(
+                    new UsernamePasswordAuthenticationToken(
+                            request.getUsername(), request.getPassword()
+                    )
+            );
 
-        // Lấy user đầy đủ từ DB để đọc role
-        User user = userRepository.findByUsername(request.getUsername())
-                .orElseThrow(() -> new BadCredentialsException("Invalid username or password"));
+            // Lấy user đầy đủ từ DB để đọc role
+            User user = userRepository.findByUsername(request.getUsername())
+                    .orElseThrow(() -> new BadCredentialsException("Invalid username or password"));
 
-        // Thêm claim role vào JWT
-        String token = jwtService.generateToken(
-                user.getUsername(),
-                Map.of("role", user.getRole().name())
-        );
+            // Thêm claim role vào JWT
+            String token = jwtService.generateToken(
+                    user.getUsername(),
+                    Map.of("role", user.getRole().name())
+            );
 
-        return new AuthResponse(token);
+            return new AuthResponse(token);
 
-    } catch (Exception ex) {
-        throw new BadCredentialsException("Invalid username or password");
+        } catch (Exception ex) {
+            throw new BadCredentialsException("Invalid username or password");
+        }
     }
-}
 
 }
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 
 /*
 

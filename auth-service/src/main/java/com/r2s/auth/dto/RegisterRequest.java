@@ -22,39 +22,3 @@ public class RegisterRequest {
     private Role role ;// USER, ADMIN, MODERATOR
 
 }
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-//    @NotBlank @Email
-//    private String email;
-//
-//    @NotBlank
-//    private String fullName;
-//
-    // Optional: allow choosing role; default USER if null
-    private Role role;
-}

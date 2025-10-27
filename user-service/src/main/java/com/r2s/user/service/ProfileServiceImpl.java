@@ -2,6 +2,7 @@ package com.r2s.user.service;
 
 import com.r2s.user.dto.ProfileDto;
 import com.r2s.user.entity.Profile;
+import com.r2s.user.exception.NotFoundException;
 import com.r2s.user.repository.ProfileRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
@@ -19,10 +20,7 @@ public class ProfileServiceImpl implements ProfileService {
     @Transactional
     public Profile upsert(ProfileDto dto) {
         Profile p = repo.findByUsername(dto.username())
-                .orElseGet(() -> Profile.builder()
-                        .username(dto.username())
-                        .build());
-
+                .orElseGet(() -> Profile.builder().username(dto.username()).build());
         p.setFullName(dto.fullName());
         p.setEmail(dto.email());
         return repo.save(p);
@@ -31,7 +29,7 @@ public class ProfileServiceImpl implements ProfileService {
     @Override
     public Profile getByUsername(String username) {
         return repo.findByUsername(username)
-                .orElseThrow(() -> new IllegalArgumentException("Profile not found"));
+                .orElseThrow(() -> new NotFoundException("Profile not found"));
     }
 
     @Override
@@ -42,13 +40,9 @@ public class ProfileServiceImpl implements ProfileService {
     @Override
     @Transactional
     public void deleteByUsername(String username) {
-        int affected = repo.deleteByUsername(username);
-//        long affected = repo.deleteByUsername(username);
+        long affected = repo.deleteByUsername(username); // JPA sẽ trả số hàng xóa
         if (affected == 0) {
-            throw new org.springframework.web.server.ResponseStatusException(
-                    org.springframework.http.HttpStatus.NOT_FOUND, "Profile not found");
+            throw new NotFoundException("Profile not found");
         }
     }
-
-
 }
