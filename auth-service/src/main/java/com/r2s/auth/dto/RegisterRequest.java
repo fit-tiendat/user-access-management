@@ -1,6 +1,7 @@
 package com.r2s.auth.dto;
 
-import com.r2s.auth.entity.Role;
+
+import com.r2s.core.entity.Role;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.Size;
 import lombok.AllArgsConstructor;
