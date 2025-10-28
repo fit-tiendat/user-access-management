@@ -64,5 +64,15 @@ public class JwtService {
         Object role = parse(token).getBody().get("role");
         return role == null ? null : role.toString();
     }
+    // core/src/main/java/com/r2s/core/security/JwtService.java
+    public boolean isSignatureAndExpiryValid(String token) {
+        try {
+            // parse(token) đã kiểm tra chữ ký + hạn
+            parse(token);
+            return true;
+        } catch (JwtException | IllegalArgumentException e) {
+            return false;
+        }
+    }
 
 }
