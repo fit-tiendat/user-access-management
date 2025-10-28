@@ -1,6 +1,6 @@
 package com.r2s.auth.config;
 
-import com.r2s.auth.security.JwtFilter;
+//import com.r2s.auth.security.JwtFilter;
 import lombok.RequiredArgsConstructor;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -21,8 +21,9 @@ import org.springframework.security.web.authentication.UsernamePasswordAuthentic
 @EnableMethodSecurity(prePostEnabled = true) // ✅ chỉ dùng cái này ở Spring Security 6/Boot 3
 @RequiredArgsConstructor
 public class SecurityConfig {
+    private final com.r2s.core.security.JwtFilter jwtFilter;
 
-    private final JwtFilter jwtFilter;
+//    private final JwtFilter jwtFilter;
     private final UserDetailsService userDetailsService;
 
     @Bean

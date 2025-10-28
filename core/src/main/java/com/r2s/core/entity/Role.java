@@ -1,4 +1,4 @@
-package com.r2s.auth.entity;
+package com.r2s.core.entity;
 
 public enum Role {
     ROLE_USER,

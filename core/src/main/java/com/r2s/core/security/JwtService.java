@@ -1,4 +1,5 @@
-package com.r2s.auth.security;
+package com.r2s.core.security;
+
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import io.jsonwebtoken.*;

@@ -1,7 +1,9 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
-	xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+		 xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+		 xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
 	<modelVersion>4.0.0</modelVersion>
+
 	<parent>
 		<groupId>com.r2s</groupId>
 		<artifactId>user-access-management</artifactId>
@@ -9,29 +11,24 @@
 		<relativePath>../pom.xml</relativePath>
 	</parent>
 
+	<!-- Có thể giữ groupId riêng cho module nếu muốn -->
 	<groupId>com.r2s.user</groupId>
 	<artifactId>user-service</artifactId>
-	<version>0.0.1-SNAPSHOT</version>
 	<name>user-service</name>
+	<packaging>jar</packaging>
 
-	<description>Demo project for Spring Boot</description>
-	<url/>
-	<licenses>
-		<license/>
-	</licenses>
-	<developers>
-		<developer/>
-	</developers>
-	<scm>
-		<connection/>
-		<developerConnection/>
-		<tag/>
-		<url/>
-	</scm>
 	<properties>
 		<java.version>17</java.version>
 	</properties>
+
 	<dependencies>
+		<!-- Dùng core -->
+		<dependency>
+			<groupId>com.r2s</groupId>
+			<artifactId>core</artifactId>
+			<version>${project.version}</version>
+		</dependency>
+
 		<!-- Web + Validation + Security + JPA -->
 		<dependency>
 			<groupId>org.springframework.boot</groupId>
@@ -57,41 +54,25 @@
 			<scope>runtime</scope>
 		</dependency>
 
-		<!-- JWT (giống auth-service) -->
-		<dependency>
-			<groupId>io.jsonwebtoken</groupId>
-			<artifactId>jjwt-api</artifactId>
-			<version>0.11.5</version>
-		</dependency>
-		<dependency>
-			<groupId>io.jsonwebtoken</groupId>
-			<artifactId>jjwt-impl</artifactId>
-			<version>0.11.5</version>
-			<scope>runtime</scope>
-		</dependency>
-		<dependency>
-			<groupId>io.jsonwebtoken</groupId>
-			<artifactId>jjwt-jackson</artifactId>
-			<version>0.11.5</version>
-			<scope>runtime</scope>
-		</dependency>
-
+		<!-- Lombok -->
 		<dependency>
 			<groupId>org.projectlombok</groupId>
 			<artifactId>lombok</artifactId>
 			<optional>true</optional>
 		</dependency>
 
+		<!-- Test -->
 		<dependency>
 			<groupId>org.springframework.boot</groupId>
 			<artifactId>spring-boot-starter-test</artifactId>
 			<scope>test</scope>
 		</dependency>
 		<dependency>
-			<groupId>com.r2s.core</groupId>
-			<artifactId>core</artifactId>
-			<version>${project.version}</version>
+			<groupId>org.springdoc</groupId>
+			<artifactId>springdoc-openapi-starter-webmvc-ui</artifactId>
+			<version>2.6.0</version>
 		</dependency>
+
 	</dependencies>
 
 	<build>
@@ -102,5 +83,4 @@
 			</plugin>
 		</plugins>
 	</build>
-
 </project>

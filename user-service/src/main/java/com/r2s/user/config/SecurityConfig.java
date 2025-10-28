@@ -1,6 +1,6 @@
 package com.r2s.user.config;
 
-import com.r2s.user.security.JwtFilter;
+//import com.r2s.user.security.JwtFilter;
 import lombok.RequiredArgsConstructor;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -14,8 +14,9 @@ import org.springframework.security.web.authentication.UsernamePasswordAuthentic
 @EnableMethodSecurity
 @RequiredArgsConstructor
 public class SecurityConfig {
+    private final com.r2s.core.security.JwtFilter jwtFilter;
 
-    private final JwtFilter jwtFilter;
+//    private final JwtFilter jwtFilter;
 
     @Bean
     public SecurityFilterChain filterChain(HttpSecurity http) throws Exception {
