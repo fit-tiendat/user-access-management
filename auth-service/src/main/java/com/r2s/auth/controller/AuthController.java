@@ -3,7 +3,7 @@ package com.r2s.auth.controller;
 import com.r2s.auth.dto.AuthResponse;
 import com.r2s.auth.dto.LoginRequest;
 import com.r2s.auth.dto.RegisterRequest;
-import com.r2s.auth.entity.User;
+import com.r2s.core.entity.User;
 import com.r2s.auth.service.AuthService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
