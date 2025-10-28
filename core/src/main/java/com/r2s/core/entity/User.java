@@ -1,4 +1,4 @@
-package com.r2s.auth.entity;
+package com.r2s.core.entity;
 
 import jakarta.persistence.*;
 import lombok.*;
@@ -26,4 +26,5 @@ public class User {
     @Enumerated(EnumType.STRING)
     @Column(nullable = false)
     private Role role;
+    
 }

@@ -1,7 +1,8 @@
-package com.r2s.auth.service;
+package com.r2s.core.security;
 
-import com.r2s.auth.entity.User;
-import com.r2s.auth.repository.UserRepository;
+
+import com.r2s.core.entity.User;
+import com.r2s.core.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.core.userdetails.UserDetails;
