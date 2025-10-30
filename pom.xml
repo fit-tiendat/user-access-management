@@ -20,6 +20,9 @@
         <spring-boot.version>3.5.6</spring-boot.version>
         <!-- Dùng chung cho core -->
         <jjwt.version>0.11.5</jjwt.version>
+        <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
+        <maven.compiler.encoding>UTF-8</maven.compiler.encoding>
+
     </properties>
 
     <!-- Quản lý version lib theo BOM của Spring Boot -->
