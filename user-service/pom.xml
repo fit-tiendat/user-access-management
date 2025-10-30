@@ -77,10 +77,32 @@
 
 	<build>
 		<plugins>
+			<!-- Đặt plugin Spring Boot + chạy goal repackage khi package -->
 			<plugin>
 				<groupId>org.springframework.boot</groupId>
 				<artifactId>spring-boot-maven-plugin</artifactId>
+				<!-- dùng cùng version Spring Boot với project cha nếu bạn có property;
+                     nếu không, có thể ghi thẳng version đang dùng, ví dụ 3.4.4 -->
+				<version>3.4.4</version>
+				<executions>
+					<execution>
+						<goals>
+							<goal>repackage</goal>
+						</goals>
+					</execution>
+				</executions>
+			</plugin>
+
+			<!-- (tuỳ chọn) Khai báo maven-compiler nếu bạn muốn pin source/target -->
+			<plugin>
+				<groupId>org.apache.maven.plugins</groupId>
+				<artifactId>maven-compiler-plugin</artifactId>
+				<version>3.11.0</version>
+				<configuration>
+					<release>17</release>
+				</configuration>
 			</plugin>
 		</plugins>
 	</build>
+
 </project>

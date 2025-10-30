@@ -1,0 +1,22 @@
+# Maven outputs
+# Ignore hầu hết target nhưng vẫn gửi file JAR
+**/target/**
+!**/target/
+!**/target/*-SNAPSHOT.jar
+
+# IDE & linh tinh
+.idea
+**/*.iml
+.DS_Store
+
+
+.idea/
+.vscode/
+.git
+.gitignore
+
+Thumbs.db
+
+# Node / temp (nếu có)
+**/node_modules/
+**/.env
