@@ -1,8 +1,8 @@
 package com.r2s.user.service;
 
+import com.r2s.core.exception.NotFoundException;
 import com.r2s.user.dto.ProfileDto;
 import com.r2s.user.entity.Profile;
-import com.r2s.user.exception.NotFoundException;
 import com.r2s.user.repository.ProfileRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;

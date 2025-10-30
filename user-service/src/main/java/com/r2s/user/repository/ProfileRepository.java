@@ -13,9 +13,6 @@ public interface ProfileRepository extends JpaRepository<Profile, Long> {
     Optional<Profile> findByUsername(String username);
     boolean existsByUsername(String username);
 
-    // ĐỂ Ý: dùng kiểu trả về long để biết có xóa được hay không
-//    long deleteByUsername(String username);
-
     @Modifying(clearAutomatically = true, flushAutomatically = true)
     @Transactional
     @Query("delete from Profile p where p.username = :username")
