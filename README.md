@@ -1,51 +1,248 @@
-# User Access Management (Multi-Module)
+# User Access Management
 
-## 📁 Modules
-- **core** – Library dùng chung giữa các service
-- **auth-service** – Cổng **8081**, endpoint test: [`/api/auth/hello`](http://localhost:8081/api/auth/hello)
-- **user-service** – Cổng **8082**, endpoint test: [`/api/users/hello`](http://localhost:8082/api/users/hello)
+Mono-repo gồm 3 module:
+- `core` – entity/common utils
+- `auth-service` – đăng ký/đăng nhập/JWT
+- `user-service` – quản lý người dùng & hồ sơ
+
+Repo đã **dockerize** đầy đủ (Postgres + 2 service) và tài liệu hóa cách dùng **pgAdmin** để truy cập DB trong container.
 
 ---
 
-## ⚙️ Build
-```bash
-./mvnw clean install
-▶️ Run Services
-Chạy từng service bằng Maven Wrapper:
-# Auth Service
-./mvnw -pl auth-service spring-boot:run
+## 🧭 Mục lục
+- [Yêu cầu](#yêu-cầu)
+- [Cấu trúc](#cấu-trúc)
+- [Biến môi trường](#biến-môi-trường)
+- [Build & chạy](#build--chạy)
+- [Kiểm tra nhanh (smoke tests)](#kiểm-tra-nhanh-smoke-tests)
+- [Kết nối DB trong container](#kết-nối-db-trong-container)
+    - [pgAdmin (khuyến nghị)](#pgadmin-khuyến-nghị)
+    - [DBeaver (lưu ý TimeZone)](#dbeaver-lưu-ý-timezone)
+    - [psql (dòng lệnh)](#psql-dòng-lệnh)
+- [Volumes & dữ liệu bền vững](#volumes--dữ-liệu-bền-vững)
+- [Troubleshooting](#troubleshooting)
+- [Ghi chú phát triển](#ghi-chú-phát-triển)
 
-# User Service
-./mvnw -pl user-service spring-boot:run
+---
 
-Hoặc chạy trực tiếp trong IntelliJ:
+## Yêu cầu
+- **JDK 17+**
+- **Maven 3.9+**
+- **Docker Desktop** (Compose v2)
+- (Tùy chọn) **pgAdmin 4** hoặc **DBeaver**
 
-Run class AuthServiceApplication và UserServiceApplication.
-✅ Verify
+---
 
-Sau khi chạy cả hai service:
+## Cấu trúc
+user-access-manament/
+├─ core/
+├─ auth-service/
+│ ├─ src/main/resources/
+│ │ ├─ application.properties
+│ │ └─ application-docker.properties
+│ ├─ Dockerfile
+│ └─ .dockerignore
+├─ user-service/
+│ ├─ src/main/resources/
+│ │ ├─ application.properties
+│ │ └─ application-docker.properties
+│ ├─ Dockerfile
+│ └─ .dockerignore
+├─ postgres/
+│ └─ init.sql # tạo DB auth_service, user_service khi lần đầu dựng
+├─ docker-compose.yaml
+├─ .env # biến môi trường DB
+└─ README.md
 
-Mở trình duyệt hoặc Postman:
+yaml
+Sao chép mã
 
-Auth Service: http://localhost:8081/api/auth/hello
+---
 
-Hello from Auth Service - v1.0.0
+## Biến môi trường
+Tạo file `.env` (đã có mẫu trong repo). Điều chỉnh nếu cần:
+```env
+POSTGRES_USER=postgres
+POSTGRES_PASSWORD=d433221dat
+POSTGRES_DB=postgres
 
+# Port mapping cho Postgres container (host:container)
+POSTGRES_PORT_HOST=55432
+POSTGRES_PORT_CONTAINER=5432
+Mặc định map 55432 → 5432 để tránh đụng CSDL Postgres đang chạy local.
 
-User Service: http://localhost:8082/api/users/hello
+Build & chạy
+1) Build jar (bỏ qua test nếu muốn)
+bash
+Sao chép mã
+mvn -q -DskipTests clean package
+2) Dựng toàn bộ stack
+bash
+Sao chép mã
+docker compose up --build
+Sau khi thành công:
 
-Hello from User Service - v1.0.0
+auth-service: http://localhost:8081
 
-🧩 Project Structure
-user-access-management/
-├── pom.xml                # Parent POM
-├── core/
-├── auth-service/
-└── user-service/
-👨‍💻 Author
+user-service: http://localhost:8082
 
-Nguyễn Tiến Đạt
-R2S - User Access Management Project
+postgres: lắng nghe trên 127.0.0.1:55432
 
+3) Dừng & xóa container (giữ data)
+bash
+Sao chép mã
+docker compose down
+Muốn xóa cả data volume: docker compose down -v
 
--
+Kiểm tra nhanh (smoke tests)
+1) Đăng ký & đăng nhập
+bash
+Sao chép mã
+# Register
+curl -s -X POST http://localhost:8081/auth/register \
+  -H "Content-Type: application/json" \
+  -d '{"username":"test user1","password":"123456"}'
+
+curl -s -X POST http://localhost:8081/auth/register \
+  -H "Content-Type: application/json" \
+  -d '{"username":"test user2","password":"123456","role":"ROLE_ADMIN"}'
+
+# Login (nhận JWT)
+TOKEN=$(curl -s -X POST http://localhost:8081/auth/login \
+  -H "Content-Type: application/json" \
+  -d '{"username":"test user1","password":"123456"}' | jq -r .token)
+echo "$TOKEN"
+2) Gọi API cần Bearer token
+bash
+Sao chép mã
+curl -s http://localhost:8082/users \
+  -H "Authorization: Bearer $TOKEN"
+Kết nối DB trong container
+pgAdmin (khuyến nghị)
+Mở pgAdmin → Register → Server…
+
+Tab General
+
+Name: docker-postgres (55432) (tuỳ)
+
+Tab Connection
+
+Host name/address: 127.0.0.1
+
+Port: 55432
+
+Maintenance DB: postgres
+
+Username: postgres
+
+Password: (lấy từ .env, mặc định d433221dat)
+
+Save → Connect
+
+Mở database auth_service hoặc user_service → Query Tool:
+
+sql
+Sao chép mã
+select * from users;
+Bạn sẽ thấy các user vừa đăng ký (test user1, test user2) nếu tạo qua API.
+
+DBeaver (lưu ý TimeZone)
+KHÔNG đặt TimeZone=Asia/Saigon (PostgreSQL không nhận).
+
+Nếu cần TZ, dùng Asia/Ho_Chi_Minh hoặc bỏ hẳn tham số TimeZone.
+
+Thông số kết nối:
+
+Host: 127.0.0.1
+
+Port: 55432
+
+Database: auth_service (hoặc user_service)
+
+User/Pass: theo .env
+
+psql (dòng lệnh)
+bash
+Sao chép mã
+# Liệt kê DB
+docker exec -it postgres-db psql -U postgres -c "\l"
+
+# Query nhanh
+docker exec -it postgres-db psql -U postgres -d auth_service \
+  -c "select id, username from users order by id desc limit 5;"
+Volumes & dữ liệu bền vững
+Compose tạo volume tên: user-access-manament_postgres_data
+
+Xem vị trí (host):
+
+bash
+Sao chép mã
+docker volume inspect user-access-manament_postgres_data
+Xóa sạch dữ liệu DB:
+
+bash
+Sao chép mã
+docker compose down -v
+Troubleshooting
+1) no main manifest attribute, in /app/app.jar
+Đảm bảo dùng Spring Boot Maven Plugin (đóng gói kiểu Boot jar).
+
+MANIFEST kiểm tra phải có:
+
+pgsql
+Sao chép mã
+Main-Class: org.springframework.boot.loader.launch.JarLauncher
+Start-Class: com.r2s.auth.AuthServiceApplication
+Lệnh kiểm tra:
+
+bash
+Sao chép mã
+jar tf auth-service/target/auth-service-1.0.0-SNAPSHOT.jar | Select-String MANIFEST.MF
+jar xf auth-service/target/auth-service-1.0.0-SNAPSHOT.jar META-INF/MANIFEST.MF
+type META-INF/MANIFEST.MF
+2) Lỗi Docker build: lstat /target: no such file or directory
+Bạn chạy docker compose up --build khi chưa build Maven.
+→ Chạy lại: mvn -q -DskipTests clean package rồi mới compose.
+
+3) DBeaver báo: FATAL: invalid value for parameter "TimeZone": "Asia/Saigon"
+Dùng Asia/Ho_Chi_Minh hoặc bỏ tham số TimeZone trong Driver Properties.
+
+4) Không kết nối được Postgres từ pgAdmin/DBeaver
+Đảm bảo container postgres-db đang Up:
+
+bash
+Sao chép mã
+docker ps
+Đúng port: 127.0.0.1:55432
+
+Warinings Connection refused → coi lại firewall/antivirus chặn port.
+
+5) DB hiển thị dữ liệu “cũ”
+Bạn có thể đang kết nối nhầm local 5432 thay vì container 55432.
+
+Kiểm tra lại server config trong tool, hoặc \conninfo (psql).
+
+Ghi chú phát triển
+Hồ sơ Docker:
+
+Base image: eclipse-temurin:17-jre
+
+Copy final jar → /app/app.jar
+
+ENTRYPOINT ["java","-jar","/app/app.jar"]
+
+Hồ sơ Compose:
+
+postgres (15), port map 55432:5432
+
+auth-service (8081), user-service (8082)
+
+Volume user-access-manament_postgres_data giữ data lâu dài
+
+License
+Internal project. All rights reserved.
+
+css
+Sao chép mã
+
+> Nếu bạn muốn mình sinh thêm file `docs/db-admin/PGADMIN.md`/`postgres/README.md` tách riêng theo đúng format nội bộ, nói mình viết tiếp nhé.
