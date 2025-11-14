@@ -4,14 +4,17 @@ import com.r2s.user.dto.ProfileDto;
 import com.r2s.user.entity.Profile;
 import com.r2s.user.service.ProfileService;
 import jakarta.validation.Valid;
+import jakarta.validation.constraints.Pattern;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.Authentication;
+import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
 
+@Validated
 @RestController
 @RequestMapping("${api.base-path:/api/v1}/users")
 @RequiredArgsConstructor
@@ -36,12 +39,16 @@ public class ProfileController {
     @GetMapping
     @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<List<Profile>> all() {
+
         return ResponseEntity.ok(service.getAll());
     }
 
     @DeleteMapping("/{username}")
     @PreAuthorize("hasRole('ADMIN')")
-    public ResponseEntity<Void> delete(@PathVariable("username") String username) {
+    public ResponseEntity<Void> delete
+            (@PathVariable("username")
+             @Pattern(regexp = "^\\S+$", message = "Username must not contain spaces")
+             String username) {
         service.deleteByUsername(username);
         return ResponseEntity.noContent().build();
     }
