@@ -27,19 +27,24 @@ public class SecurityConfig {
     private final UserDetailsService userDetailsService;
 
     @Bean
-    public SecurityFilterChain filterChain(HttpSecurity http) throws Exception {
-        http
+    SecurityFilterChain filterChain(HttpSecurity http) throws Exception {
+        return http
                 .csrf(csrf -> csrf.disable())
                 .sessionManagement(sess -> sess.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
                 .authorizeHttpRequests(auth -> auth
-                        .requestMatchers("/api/v1/auth/**", "/h2-console/**").permitAll()
+                        .requestMatchers("/actuator/health", "/actuator/info").permitAll()
+                        // mở cả 2 kiểu path để khớp với test
+                        .requestMatchers("/auth/register", "/auth/login").permitAll()
+                        .requestMatchers("/api/v1/auth/**").permitAll()
+                        // swagger (nếu cần)
+                        .requestMatchers("/auth/**").permitAll()
+                        .requestMatchers("/v3/api-docs/**", "/swagger-ui/**", "/swagger-ui.html").permitAll()
                         .anyRequest().authenticated()
                 )
                 .headers(h -> h.frameOptions(frame -> frame.disable()))
                 .authenticationProvider(authenticationProvider())
-                .addFilterBefore(jwtFilter, UsernamePasswordAuthenticationFilter.class);
-
-        return http.build();
+                .addFilterBefore(jwtFilter, UsernamePasswordAuthenticationFilter.class)
+                .build();
     }
 
     @Bean

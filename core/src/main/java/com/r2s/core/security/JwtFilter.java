@@ -1,17 +1,14 @@
-// core/src/main/java/com/r2s/core/security/JwtFilter.java
 package com.r2s.core.security;
 
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
-import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.http.HttpHeaders;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.GrantedAuthority;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.core.context.SecurityContextHolder;
-import org.springframework.security.core.userdetails.UserDetailsService;
 import org.springframework.security.web.authentication.WebAuthenticationDetailsSource;
 import org.springframework.stereotype.Component;
 import org.springframework.web.filter.OncePerRequestFilter;
@@ -24,16 +21,33 @@ import java.util.List;
 public class JwtFilter extends OncePerRequestFilter {
 
     private final JwtService jwtService;
-    private final ObjectProvider<UserDetailsService> udsProvider; // optional
 
-    public JwtFilter(JwtService jwtService, ObjectProvider<UserDetailsService> udsProvider) {
+    public JwtFilter(JwtService jwtService) {
         this.jwtService = jwtService;
-        this.udsProvider = udsProvider;
     }
 
     @Override
-    protected void doFilterInternal(HttpServletRequest request, HttpServletResponse response,
-                                    FilterChain filterChain) throws ServletException, IOException {
+    protected void doFilterInternal(HttpServletRequest request,
+                                    HttpServletResponse response,
+                                    FilterChain filterChain)
+            throws ServletException, IOException {
+
+        String path = request.getServletPath();
+
+        // 1) Bỏ qua hoàn toàn cho các endpoint public: login/register, swagger, actuator...
+        if (path.startsWith("/api/v1/auth")
+                || path.startsWith("/auth")
+                || path.startsWith("/actuator")
+                || path.startsWith("/error")
+                || path.startsWith("/v3/api-docs")
+                || path.startsWith("/swagger-ui")) {
+
+            filterChain.doFilter(request, response);
+            return;
+        }
+
+        // 2) Lấy header Authorization. Nếu không có / sai format -> KHÔNG tự 401,
+        // cứ cho đi tiếp để Spring Security tự xử lý (endpoint yêu cầu auth sẽ 401).
         String authHeader = request.getHeader(HttpHeaders.AUTHORIZATION);
         if (authHeader == null || !authHeader.startsWith("Bearer ")) {
             filterChain.doFilter(request, response);
@@ -41,30 +55,52 @@ public class JwtFilter extends OncePerRequestFilter {
         }
 
         String token = authHeader.substring(7);
-        String username = jwtService.extractUsername(token);
-        String role = jwtService.extractRole(token); // "ROLE_USER"...
 
-        if (username != null && SecurityContextHolder.getContext().getAuthentication() == null) {
-            UserDetailsService uds = udsProvider.getIfAvailable();
+        try {
+            // 3) Check chữ ký + expiry của JWT
+            if (!jwtService.isSignatureAndExpiryValid(token)) {
+                response.sendError(HttpServletResponse.SC_UNAUTHORIZED, "Invalid JWT");
+                return;
+            }
 
-            boolean valid = (uds != null)
-                    ? jwtService.isValid(token, username)            // auth-service
-                    : jwtService.isSignatureAndExpiryValid(token);   // user-service
+            // 4) Lấy thông tin từ token
+            String username = jwtService.extractUsername(token);
+            String roleClaim = jwtService.extractRole(token);
 
-            if (valid) {
-                // 👉 Gõ kiểu tường minh để khớp với constructor
-                List<? extends GrantedAuthority> authorities =
-                        (role == null)
-                                ? Collections.<SimpleGrantedAuthority>emptyList()
-                                : List.of(new SimpleGrantedAuthority(role));
+            // Nếu chưa có Authentication trong SecurityContext thì set vào
+            if (username != null
+                    && SecurityContextHolder.getContext().getAuthentication() == null) {
+
+                String authorityName = null;
+                if (roleClaim != null) {
+                    authorityName = roleClaim.startsWith("ROLE_")
+                            ? roleClaim
+                            : "ROLE_" + roleClaim;
+                }
+
+                List<GrantedAuthority> authorities =
+                        authorityName == null
+                                ? Collections.emptyList()
+                                : List.of(new SimpleGrantedAuthority(authorityName));
 
                 var authToken = new UsernamePasswordAuthenticationToken(
-                        username, null, authorities
+                        username,
+                        null,
+                        authorities
                 );
-                authToken.setDetails(new WebAuthenticationDetailsSource().buildDetails(request));
+                authToken.setDetails(
+                        new WebAuthenticationDetailsSource().buildDetails(request)
+                );
                 SecurityContextHolder.getContext().setAuthentication(authToken);
             }
+
+        } catch (RuntimeException ex) {
+            // Bất kỳ lỗi parse/validate JWT nào -> 401
+            response.sendError(HttpServletResponse.SC_UNAUTHORIZED, "Invalid JWT");
+            return;
         }
+
+        // 5) Cho request đi tiếp
         filterChain.doFilter(request, response);
     }
 }

@@ -19,4 +19,4 @@ Thumbs.db
 
 # Node / temp (nếu có)
 **/node_modules/
-**/.env
+.env

@@ -63,11 +63,24 @@ public class AuthServiceImpl implements AuthService {
             User user = userRepository.findByUsername(request.getUsername())
                     .orElseThrow(() -> new BadCredentialsException("Invalid username or password"));
 
+            // ===== Chuẩn hoá role claim =====
+            // Enum có thể là USER/ADMIN hoặc ROLE_USER/ROLE_ADMIN
+            String enumName = user.getRole().name();       // "USER" hoặc "ROLE_USER"
+            String roleClaim = enumName.startsWith("ROLE_")
+                    ? enumName
+                    : "ROLE_" + enumName;                  // luôn ra "ROLE_USER"/"ROLE_ADMIN"
+
+
             // Thêm claim role vào JWT
             String token = jwtService.generateToken(
                     user.getUsername(),
-                    Map.of("role", user.getRole().name())
+                    Map.of("role",roleClaim)
             );
+            System.out.println("=== LOGIN TOKEN ===");
+            System.out.println("username: " + user.getUsername());
+            System.out.println("role enum: " + enumName);
+            System.out.println("roleClaim in JWT: " + roleClaim);
+            System.out.println("token: " + token);
 
             return new AuthResponse(token);
 
