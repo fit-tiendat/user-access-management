@@ -2,6 +2,7 @@
 <project xmlns="http://maven.apache.org/POM/4.0.0"
 		 xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
 		 xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
+
 	<modelVersion>4.0.0</modelVersion>
 
 	<parent>
@@ -11,7 +12,6 @@
 		<relativePath>../pom.xml</relativePath>
 	</parent>
 
-	<!-- Có thể giữ groupId riêng cho module nếu muốn -->
 	<groupId>com.r2s.user</groupId>
 	<artifactId>user-service</artifactId>
 	<name>user-service</name>
@@ -22,7 +22,7 @@
 	</properties>
 
 	<dependencies>
-		<!-- Dùng core -->
+		<!-- Dùng core dùng chung -->
 		<dependency>
 			<groupId>com.r2s</groupId>
 			<artifactId>core</artifactId>
@@ -61,52 +61,53 @@
 			<optional>true</optional>
 		</dependency>
 
-		<!-- Test -->
-		<dependency>
-			<groupId>org.springframework.boot</groupId>
-			<artifactId>spring-boot-starter-test</artifactId>
-			<scope>test</scope>
-		</dependency>
-		<!-- Mockito Core (đã transitively có), thêm Security Test cho @WithMockUser -->
-		<dependency>
-			<groupId>org.springframework.security</groupId>
-			<artifactId>spring-security-test</artifactId>
-			<scope>test</scope>
-		</dependency>
+		<!-- Monitoring & docs -->
 		<dependency>
 			<groupId>org.springdoc</groupId>
 			<artifactId>springdoc-openapi-starter-webmvc-ui</artifactId>
 			<version>2.6.0</version>
-		</dependency>
-
-		<dependency>
-			<groupId>org.testcontainers</groupId>
-			<artifactId>junit-jupiter</artifactId>
-			<version>1.20.3</version>
-			<scope>test</scope>
-		</dependency>
-		<dependency>
-			<groupId>org.testcontainers</groupId>
-			<artifactId>testcontainers</artifactId>
-			<version>1.20.3</version>
-			<scope>test</scope>
-		</dependency>
-		<dependency>
-			<groupId>io.rest-assured</groupId>
-			<artifactId>rest-assured</artifactId>
-			<version>5.5.0</version>
-			<scope>test</scope>
 		</dependency>
 		<dependency>
 			<groupId>org.springframework.boot</groupId>
 			<artifactId>spring-boot-starter-actuator</artifactId>
 		</dependency>
 
+		<!-- Test -->
+		<dependency>
+			<groupId>org.springframework.boot</groupId>
+			<artifactId>spring-boot-starter-test</artifactId>
+			<scope>test</scope>
+		</dependency>
+		<dependency>
+			<groupId>org.springframework.security</groupId>
+			<artifactId>spring-security-test</artifactId>
+			<scope>test</scope>
+		</dependency>
+		<dependency>
+			<groupId>io.rest-assured</groupId>
+			<artifactId>rest-assured</artifactId>
+			<scope>test</scope>
+		</dependency>
+		<dependency>
+			<groupId>org.testcontainers</groupId>
+			<artifactId>testcontainers</artifactId>
+			<scope>test</scope>
+		</dependency>
+		<dependency>
+			<groupId>org.testcontainers</groupId>
+			<artifactId>junit-jupiter</artifactId>
+			<scope>test</scope>
+		</dependency>
+		<dependency>
+			<groupId>org.testcontainers</groupId>
+			<artifactId>postgresql</artifactId>
+			<scope>test</scope>
+		</dependency>
 	</dependencies>
 
 	<build>
 		<plugins>
-			<!-- Spring Boot plugin: KHÔNG ghim version, dùng từ parent -->
+			<!-- Spring Boot plugin: repackage thành fat-jar -->
 			<plugin>
 				<groupId>org.springframework.boot</groupId>
 				<artifactId>spring-boot-maven-plugin</artifactId>
@@ -119,45 +120,23 @@
 				</executions>
 			</plugin>
 
-			<!-- Unit test: chỉ chạy *Test -->
+			<!-- TẤT CẢ test (Unit + IT + E2E) đều chạy bằng surefire -->
 			<plugin>
 				<groupId>org.apache.maven.plugins</groupId>
 				<artifactId>maven-surefire-plugin</artifactId>
-				<version>3.5.1</version>
+				<version>3.5.4</version>
 				<configuration>
 					<includes>
 						<include>**/*Test.java</include>
-					</includes>
-					<!-- Chắc chắn loại *IT, *E2E khỏi surefire -->
-					<excludes>
-						<exclude>**/*IT.java</exclude>
-						<exclude>**/*E2E.java</exclude>
-					</excludes>
-				</configuration>
-			</plugin>
-
-			<!-- Integration/E2E test: chạy ở phase verify -->
-			<plugin>
-				<groupId>org.apache.maven.plugins</groupId>
-				<artifactId>maven-failsafe-plugin</artifactId>
-				<version>3.5.1</version>
-				<configuration>
-					<includes>
 						<include>**/*IT.java</include>
 						<include>**/*E2E.java</include>
 					</includes>
 				</configuration>
-				<executions>
-					<execution>
-						<goals>
-							<goal>integration-test</goal>
-							<goal>verify</goal>
-						</goals>
-					</execution>
-				</executions>
 			</plugin>
 
-			<!-- Compiler (tuỳ chọn) -->
+			<!-- KHÔNG dùng failsafe nữa, tránh lỗi NoClassDefFound -->
+
+			<!-- Compiler -->
 			<plugin>
 				<groupId>org.apache.maven.plugins</groupId>
 				<artifactId>maven-compiler-plugin</artifactId>
