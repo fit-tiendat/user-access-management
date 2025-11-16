@@ -1,0 +1,79 @@
+stages:
+  - test
+  - build
+  - docker
+
+# Dùng chung cho các job Maven
+.default-maven-job:
+  image: maven:3.9.9-eclipse-temurin-17
+  services:
+    - docker:27-dind     # cho Testcontainers dùng được Docker
+  variables:
+    DOCKER_HOST: tcp://docker:2375
+    DOCKER_TLS_CERTDIR: ""
+    MAVEN_OPTS: "-Dmaven.repo.local=.m2/repository"
+  cache:
+    key: maven-cache
+    paths:
+      - .m2/repository
+  before_script:
+    - java -version
+    - mvn -v
+
+# 1) Chạy test + tạo HTML report
+maven_test:
+  stage: test
+  extends: .default-maven-job
+  script:
+    # Chạy test cho toàn bộ multi-module + tạo HTML report
+    - mvn clean test surefire-report:report
+  artifacts:
+    when: always
+    paths:
+      # JUnit XML để GitLab hiện tab "Tests"
+      - auth-service/target/surefire-reports
+      - user-service/target/surefire-reports
+
+      # HTML report (plugin surefire-report) – bạn đã cấu hình ở pom rồi
+      - auth-service/target/site
+      - user-service/target/site
+    reports:
+      junit:
+        - auth-service/target/surefire-reports/*.xml
+        - user-service/target/surefire-reports/*.xml
+
+# 2) Build JAR sau khi test pass
+maven_package:
+  stage: build
+  extends: .default-maven-job
+  needs: ["maven_test"]
+  script:
+    # Đã test ở job trên nên skip test ở đây
+    - mvn -DskipTests package
+  artifacts:
+    paths:
+      - auth-service/target/*.jar
+      - user-service/target/*.jar
+
+# 3) Build & push Docker image lên GitLab Container Registry
+docker_build:
+  stage: docker
+  image: docker:27
+  services:
+    - docker:27-dind
+  variables:
+    DOCKER_HOST: tcp://docker:2375
+    DOCKER_TLS_CERTDIR: ""
+  needs: ["maven_package"]
+  script:
+    - echo "Login GitLab Container Registry"
+    - docker login -u "$CI_REGISTRY_USER" -p "$CI_JOB_TOKEN" "$CI_REGISTRY"
+
+    # Lưu ý: Dockerfile của bạn dùng context là root (.) giống docker-compose
+    - docker build -t "$CI_REGISTRY_IMAGE/auth-service:$CI_COMMIT_SHORT_SHA" -f auth-service/Dockerfile .
+    - docker build -t "$CI_REGISTRY_IMAGE/user-service:$CI_COMMIT_SHORT_SHA" -f user-service/Dockerfile .
+
+    - docker push "$CI_REGISTRY_IMAGE/auth-service:$CI_COMMIT_SHORT_SHA"
+    - docker push "$CI_REGISTRY_IMAGE/user-service:$CI_COMMIT_SHORT_SHA"
+  only:
+    - main   # chỉ build & push khi code lên nhánh main
