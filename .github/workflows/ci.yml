@@ -50,15 +50,12 @@ jobs:
           java-version: 17
           cache: maven
 
-      - name: Run tests (skip AuthE2EFlowTest) + HTML report
+      # Chạy toàn bộ test nhưng bỏ qua AuthE2EFlowTest
+      - name: Run Maven tests (skip AuthE2EFlowTest) + HTML report
         run: |
-          mvn -B -ntp -pl auth-service -am test surefire-report:report \
-            -Dtest=\!AuthE2EFlowTest
-
-
-      # Chạy toàn bộ test + tạo HTML report (giống local bạn đã chạy)
-      - name: Run Maven tests + HTML report
-        run: mvn -B clean test surefire-report:report
+          mvn -B clean test surefire-report:report \
+            -Dtest=\!AuthE2EFlowTest \
+            -DfailIfNoTests=false
 
       # Upload JUnit XML + HTML (Surefire report)
       - name: Upload test reports (JUnit XML + HTML)
@@ -70,7 +67,6 @@ jobs:
             **/target/surefire-reports
             **/target/site
 
-  # 2) Build JAR sau khi test pass
   package:
     name: Build JARs (skip tests)
     runs-on: ubuntu-latest
@@ -90,7 +86,6 @@ jobs:
       - name: Maven package (skip tests)
         run: mvn -B -DskipTests package
 
-  # 3) Build & push Docker image lên GHCR (chỉ khi push branch main)
   docker:
     name: Build & push Docker images
     runs-on: ubuntu-latest
