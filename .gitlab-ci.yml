@@ -7,9 +7,7 @@ stages:
 .default-maven-job:
   image: maven:3.9.9-eclipse-temurin-17
   services:
-    - - name: docker:27-dind
-    - privileged: true           # ✨ cho phép Docker-in-Docker chạy Testcontainers
-    - command: [ "--tls=false" ]
+    - docker:27-dind          # dùng docker:dind cho Testcontainers
   variables:
     DOCKER_HOST: tcp://docker:2375
     DOCKER_TLS_CERTDIR: ""
@@ -21,6 +19,7 @@ stages:
   before_script:
     - java -version
     - mvn -v
+
 
 # 1) Chạy test + tạo HTML report
 maven_test:
