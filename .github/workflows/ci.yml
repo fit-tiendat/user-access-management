@@ -6,25 +6,52 @@ on:
   pull_request:
     branches: [ main ]
 
+env:
+  OWNER: ${{ github.repository_owner }}
+
 jobs:
   # 1) Chạy test + tạo HTML report
   test:
+    name: Run tests with HTML report
     runs-on: ubuntu-latest
+
+    # Cho Testcontainers (AuthE2EFlowTest dùng docker-compose)
+    services:
+      docker:
+        image: docker:27-dind
+        options: --privileged
+        env:
+          DOCKER_TLS_CERTDIR: ""
+        ports:
+          - 2375:2375
+
     env:
-      # --- các biến cho docker-compose & Spring ---
+      # Cho Testcontainers nói chuyện với docker:dind
+      DOCKER_HOST: tcp://localhost:2375
+      DOCKER_TLS_CERTDIR: ""
+
+      # ====== ENV giống file .env bạn gửi ======
       POSTGRES_USER: postgres
       POSTGRES_PASSWORD: d433221dat
-      PG_PORT_HOST: 5432
+      PG_PORT_HOST: 55432
+
+      AUTH_DB: auth_service
+      USER_DB: user_service
 
       SPRING_PROFILES_ACTIVE: docker
 
-      SPRING_DATASOURCE_URL_AUTH: jdbc:postgresql://postgres-db:5432/user_access_management
-      SPRING_DATASOURCE_URL_USER: jdbc:postgresql://postgres-db:5432/user_access_management
+      # JDBC cho từng service (dùng trong E2E / docker profile)
+      SPRING_DATASOURCE_URL_AUTH: jdbc:postgresql://postgres-db:5432/auth_service
+      SPRING_DATASOURCE_URL_USER: jdbc:postgresql://postgres-db:5432/user_service
       SPRING_DATASOURCE_USERNAME: postgres
       SPRING_DATASOURCE_PASSWORD: d433221dat
 
+      # Fallback cho các test nào chỉ đọc spring.datasource.url
+      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres-db:5432/auth_service
+
+      # JWT
       JWT_SECRET: w5h2Yk1Gd3dtdkFzT0h0bTFwM05XUnJvV0V1NHVZbU5yZFRyWW9oUUNmQ1hLcw==
-      JWT_EXP_MINUTES: 120
+      JWT_EXP_MINUTES: "120"
 
     steps:
       - name: Checkout source
@@ -37,23 +64,23 @@ jobs:
           java-version: "17"
           cache: maven
 
-      - name: Run tests with HTML report
+      # Chạy toàn bộ test + tạo HTML report (giống local bạn đã chạy)
+      - name: Run Maven tests + HTML report
         run: mvn -B clean test surefire-report:report
 
+      # Upload JUnit XML + HTML (Surefire report)
       - name: Upload test reports (JUnit XML + HTML)
-        if: always()   # luôn upload report dù test pass hay fail
+        if: always()
         uses: actions/upload-artifact@v4
         with:
           name: test-reports
           path: |
-            auth-service/target/surefire-reports
-            user-service/target/surefire-reports
-            auth-service/target/site
-            user-service/target/site
-  
+            **/target/surefire-reports
+            **/target/site
 
-  # 2) Build jar sau khi test pass
+  # 2) Build JAR sau khi test pass
   package:
+    name: Build JARs (skip tests)
     runs-on: ubuntu-latest
     needs: test
 
@@ -68,46 +95,38 @@ jobs:
           java-version: "17"
           cache: maven
 
-      - name: Build jars (skip tests)
+      - name: Maven package (skip tests)
         run: mvn -B -DskipTests package
 
-      - name: Upload built jars
-        uses: actions/upload-artifact@v4
-        with:
-          name: jars
-          path: |
-            auth-service/target/*.jar
-            user-service/target/*.jar
-
-  # 3) Build & push Docker image lên GitHub Container Registry (chỉ chạy trên main)
+  # 3) Build & push Docker image lên GHCR (chỉ khi push branch main)
   docker:
+    name: Build & push Docker images
     runs-on: ubuntu-latest
     needs: package
     if: github.ref == 'refs/heads/main'
-    permissions:
-      contents: read
-      packages: write
 
     steps:
       - name: Checkout source
         uses: actions/checkout@v4
 
-      - name: Set up JDK 17
-        uses: actions/setup-java@v4
-        with:
-          distribution: temurin
-          java-version: "17"
-
       - name: Log in to GitHub Container Registry
-        run: echo "${{ github.token }}" | docker login ghcr.io -u "${{ github.actor }}" --password-stdin
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Build and push Docker images
+      - name: Build auth-service image
         run: |
-          # Tên repo Docker: ghcr.io/<owner>/<repo>-auth-service
-          OWNER=${{ github.repository_owner }}
+          docker build -t ghcr.io/${{ env.OWNER }}/user-access-management-auth-service:${{ github.sha }} \
+            -f auth-service/Dockerfile .
 
-          docker build -t ghcr.io/$OWNER/user-access-management-auth-service:latest -f auth-service/Dockerfile .
-          docker push ghcr.io/$OWNER/user-access-management-auth-service:latest
+      - name: Build user-service image
+        run: |
+          docker build -t ghcr.io/${{ env.OWNER }}/user-access-management-user-service:${{ github.sha }} \
+            -f user-service/Dockerfile .
 
-          docker build -t ghcr.io/$OWNER/user-access-management-user-service:latest -f user-service/Dockerfile .
-          docker push ghcr.io/$OWNER/user-access-management-user-service:latest
+      - name: Push images
+        run: |
+          docker push ghcr.io/${{ env.OWNER }}/user-access-management-auth-service:${{ github.sha }}
+          docker push ghcr.io/${{ env.OWNER }}/user-access-management-user-service:${{ github.sha }}
