@@ -80,8 +80,8 @@ jobs:
         run: |
           mvn -B clean test surefire-report:report \
             -DfailIfNoTests=false \
-            -Dsurefire.failIfNoSpecifiedTests=false \
-            -Dtest='*Test,!AuthE2EFlowTest,!E2EFlowTest'
+            -Dsurefire.failIfNoSpecifiedTests=false
+#            -Dtest='*Test,!AuthE2EFlowTest,!E2EFlowTest'
 
       # Upload JUnit XML + HTML (Surefire report)
       - name: Upload test reports (JUnit XML + HTML)
