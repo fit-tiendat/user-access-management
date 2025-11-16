@@ -91,4 +91,16 @@ class AuthServiceImplTest {
 
         assertThrows(BadCredentialsException.class, () -> service.login(req));
     }
+    @Test
+    void login_shouldThrowWhenUsernameNotFound() {
+        LoginRequest req = new LoginRequest();
+        req.setUsername("unknown");
+        req.setPassword("any");
+
+        when(authManager.authenticate(any()))
+                .thenThrow(new BadCredentialsException("Bad credentials"));
+
+        assertThrows(BadCredentialsException.class, () -> service.login(req));
+    }
+
 }
