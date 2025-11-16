@@ -122,24 +122,18 @@ jobs:
       - name: Checkout source
         uses: actions/checkout@v4
 
-      - name: Log in to GitHub Container Registry
-        uses: docker/login-action@v3
-        with:
-          registry: ghcr.io
-          username: ${{ github.actor }}
-          password: ${{ secrets.GITHUB_TOKEN }}
-
       - name: Build auth-service image
         run: |
-          docker build -t ghcr.io/${{ env.OWNER }}/user-access-management-auth-service:${{ github.sha }} \
+          docker build -t user-access-management-auth-service:${{ github.sha }} \
             -f auth-service/Dockerfile .
 
       - name: Build user-service image
         run: |
-          docker build -t ghcr.io/${{ env.OWNER }}/user-access-management-user-service:${{ github.sha }} \
+          docker build -t user-access-management-user-service:${{ github.sha }} \
             -f user-service/Dockerfile .
 
-      - name: Push images
-        run: |
-          docker push ghcr.io/${{ env.OWNER }}/user-access-management-auth-service:${{ github.sha }}
-          docker push ghcr.io/${{ env.OWNER }}/user-access-management-user-service:${{ github.sha }}
+      # (TẠM THỜI) Bỏ qua push lên registry vì bị giới hạn quyền
+      # - name: Push images
+      #   run: |
+      #     docker push ...
+
