@@ -50,14 +50,13 @@ jobs:
           java-version: 17
           cache: maven
 
-      # Chạy toàn bộ test nhưng bỏ qua AuthE2EFlowTest
-      - name: Run Maven tests (skip AuthE2EFlowTest) + HTML report
+      # Chạy toàn bộ test, bỏ qua AuthE2EFlowTest, không fail nếu module nào đó không có test khớp pattern
+      - name: Run Maven tests + HTML report (skip AuthE2EFlowTest)
         run: |
           mvn -B clean test surefire-report:report \
             -Dtest=\!AuthE2EFlowTest \
-            -DfailIfNoTests=false
+            -Dsurefire.failIfNoSpecifiedTests=false
 
-      # Upload JUnit XML + HTML (Surefire report)
       - name: Upload test reports (JUnit XML + HTML)
         if: always()
         uses: actions/upload-artifact@v4
