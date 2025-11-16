@@ -10,6 +10,21 @@ jobs:
   # 1) Chạy test + tạo HTML report
   test:
     runs-on: ubuntu-latest
+    env:
+      # --- các biến cho docker-compose & Spring ---
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: d433221dat
+      PG_PORT_HOST: 5432
+
+      SPRING_PROFILES_ACTIVE: docker
+
+      SPRING_DATASOURCE_URL_AUTH: jdbc:postgresql://postgres-db:5432/user_access_management
+      SPRING_DATASOURCE_URL_USER: jdbc:postgresql://postgres-db:5432/user_access_management
+      SPRING_DATASOURCE_USERNAME: postgres
+      SPRING_DATASOURCE_PASSWORD: d433221dat
+
+      JWT_SECRET: w5h2Yk1Gd3dtdkFzT0h0bTFwM05XUnJvV0V1NHVZbU5yZFRyWW9oUUNmQ1hLcw==
+      JWT_EXP_MINUTES: 120
 
     steps:
       - name: Checkout source
@@ -26,6 +41,7 @@ jobs:
         run: mvn -B clean test surefire-report:report
 
       - name: Upload test reports (JUnit XML + HTML)
+        if: always()   # luôn upload report dù test pass hay fail
         uses: actions/upload-artifact@v4
         with:
           name: test-reports
@@ -34,6 +50,7 @@ jobs:
             user-service/target/surefire-reports
             auth-service/target/site
             user-service/target/site
+  
 
   # 2) Build jar sau khi test pass
   package:
