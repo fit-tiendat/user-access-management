@@ -1,6 +1,5 @@
 package com.r2s.auth.service;
 
-
 import com.r2s.auth.dto.AuthResponse;
 import com.r2s.auth.dto.LoginRequest;
 import com.r2s.auth.dto.RegisterRequest;
@@ -9,29 +8,26 @@ import com.r2s.core.entity.User;
 import com.r2s.core.repository.UserRepository;
 import com.r2s.core.security.JwtService;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.authentication.BadCredentialsException;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.Authentication;
-import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-
-import java.util.Collections;
-import java.util.HashMap;
 import java.util.Map;
 
-
+@Slf4j
 @Service
 @RequiredArgsConstructor
 public class AuthServiceImpl implements AuthService {
+
     private final UserRepository userRepository;
     private final PasswordEncoder passwordEncoder;
     private final AuthenticationManager authManager;
     private final JwtService jwtService;
-
 
     @Override
     @Transactional
@@ -39,7 +35,9 @@ public class AuthServiceImpl implements AuthService {
         if (userRepository.existsByUsername(request.getUsername())) {
             throw new IllegalArgumentException("Username already exists");
         }
+
         Role role = request.getRole() != null ? request.getRole() : Role.ROLE_USER;
+
         User user = User.builder()
                 .username(request.getUsername())
                 .password(passwordEncoder.encode(request.getPassword()))
@@ -49,8 +47,8 @@ public class AuthServiceImpl implements AuthService {
         userRepository.save(user);
     }
 
-
     @Override
+    @Transactional(readOnly = true)
     public AuthResponse login(LoginRequest request) {
         try {
             Authentication auth = authManager.authenticate(
@@ -59,53 +57,29 @@ public class AuthServiceImpl implements AuthService {
                     )
             );
 
-            // Lấy user đầy đủ từ DB để đọc role
             User user = userRepository.findByUsername(request.getUsername())
                     .orElseThrow(() -> new BadCredentialsException("Invalid username or password"));
 
-            // ===== Chuẩn hoá role claim =====
-            // Enum có thể là USER/ADMIN hoặc ROLE_USER/ROLE_ADMIN
-            String enumName = user.getRole().name();       // "USER" hoặc "ROLE_USER"
+            String enumName = user.getRole().name();
             String roleClaim = enumName.startsWith("ROLE_")
                     ? enumName
-                    : "ROLE_" + enumName;                  // luôn ra "ROLE_USER"/"ROLE_ADMIN"
+                    : "ROLE_" + enumName;
 
-
-            // Thêm claim role vào JWT
             String token = jwtService.generateToken(
                     user.getUsername(),
-                    Map.of("role",roleClaim)
+                    Map.of("role", roleClaim)
             );
-            System.out.println("=== LOGIN TOKEN ===");
-            System.out.println("username: " + user.getUsername());
-            System.out.println("role enum: " + enumName);
-            System.out.println("roleClaim in JWT: " + roleClaim);
-            System.out.println("token: " + token);
+
+            // Chỉ log thông tin cần thiết, KHÔNG log token
+            log.info("User {} logged in successfully with role {}", user.getUsername(), roleClaim);
 
             return new AuthResponse(token);
 
-        } catch (Exception ex) {
-            throw new BadCredentialsException("Invalid username or password");
+        } catch (BadCredentialsException ex) {
+            // chỉ log nhẹ, không lộ password
+            log.warn("Failed login attempt for username {}", request.getUsername());
+            throw ex; // trả 401
         }
+        // các exception khác (DB, JWT, …) sẽ nổ 500 → đúng ý review: dễ giám sát và debug
     }
-
 }
-
-/*
-
-    // authenticate (will throw if bad credentials)
-    Authentication authentication=authManager.authenticate(
-            new UsernamePasswordAuthenticationToken(request.getUsername(), request.getPassword())
-    );
-    //        var principal = (UserDetails) authentication.getPrincipal();
-//        var roleNames = principal.getAuthorities().stream()
-//                .map(a -> a.getAuthority()) // "ROLE_ADMIN"...
-//                .toList();
-// generate JWT
-    Map<String, Object> claims = new HashMap<>();
-    User user = userRepository.findByUsername(request.getUsername()).orElseThrow();
-        claims.put("role", user.getRole().name());
-    String token = jwtService.generateToken(user.getUsername(), claims);
-        return new AuthResponse(token);
-}
-*/

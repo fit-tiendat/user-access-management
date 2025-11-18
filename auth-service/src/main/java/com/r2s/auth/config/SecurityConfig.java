@@ -1,9 +1,11 @@
 package com.r2s.auth.config;
 
-//import com.r2s.auth.security.JwtFilter;
+import com.r2s.core.security.JwtFilter;
 import lombok.RequiredArgsConstructor;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.http.HttpStatus;
 import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.authentication.AuthenticationProvider;
 import org.springframework.security.authentication.dao.DaoAuthenticationProvider;
@@ -18,33 +20,59 @@ import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
 
 @Configuration
-@EnableMethodSecurity(prePostEnabled = true) // ✅ chỉ dùng cái này ở Spring Security 6/Boot 3
+@EnableMethodSecurity(prePostEnabled = true) // Spring Security 6 / Boot 3
 @RequiredArgsConstructor
 public class SecurityConfig {
-    private final com.r2s.core.security.JwtFilter jwtFilter;
 
-//    private final JwtFilter jwtFilter;
+    private final JwtFilter jwtFilter;
     private final UserDetailsService userDetailsService;
 
+    // cùng property với AuthController: "${api.base-path:/api/v1}"
+    @Value("${api.base-path:/api/v1}")
+    private String apiBasePath;
+
     @Bean
-    SecurityFilterChain filterChain(HttpSecurity http) throws Exception {
-        return http
+    public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
+        // tránh hard-code, nếu sau đổi base-path thì security vẫn đúng
+        String registerPath = apiBasePath + "/auth/register";
+        String loginPath    = apiBasePath + "/auth/login";
+
+        http
                 .csrf(csrf -> csrf.disable())
-                .sessionManagement(sess -> sess.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
+                .sessionManagement(sess ->
+                        sess.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
                 .authorizeHttpRequests(auth -> auth
+                        // public health/info
                         .requestMatchers("/actuator/health", "/actuator/info").permitAll()
-                        // mở cả 2 kiểu path để khớp với test
-                        .requestMatchers("/auth/register", "/auth/login").permitAll()
-                        .requestMatchers("/api/v1/auth/**").permitAll()
-                        // swagger (nếu cần)
-                        .requestMatchers("/auth/**").permitAll()
-                        .requestMatchers("/v3/api-docs/**", "/swagger-ui/**", "/swagger-ui.html").permitAll()
+                        // chỉ mở đúng 2 endpoint auth public
+                        .requestMatchers(registerPath, loginPath).permitAll()
+                        // swagger public (nếu dùng)
+                        .requestMatchers(
+                                "/v3/api-docs/**",
+                                "/swagger-ui/**",
+                                "/swagger-ui.html"
+                        ).permitAll()
+                        // còn lại phải có JWT
                         .anyRequest().authenticated()
+                )
+                // KHÔNG dùng anonymous nữa, để thiếu token thì coi như chưa auth
+                .anonymous(anon -> anon.disable())
+                // cấu hình 401 / 403 rõ ràng
+                .exceptionHandling(ex -> ex
+                        .authenticationEntryPoint((req, res, e) -> {
+                            // thiếu hoặc token invalid -> 401
+                            res.sendError(HttpStatus.UNAUTHORIZED.value(), "Unauthorized");
+                        })
+                        .accessDeniedHandler((req, res, e) -> {
+                            // đã auth nhưng thiếu quyền (sai role) -> 403
+                            res.sendError(HttpStatus.FORBIDDEN.value(), "Forbidden");
+                        })
                 )
                 .headers(h -> h.frameOptions(frame -> frame.disable()))
                 .authenticationProvider(authenticationProvider())
-                .addFilterBefore(jwtFilter, UsernamePasswordAuthenticationFilter.class)
-                .build();
+                .addFilterBefore(jwtFilter, UsernamePasswordAuthenticationFilter.class);
+
+        return http.build();
     }
 
     @Bean
@@ -61,7 +89,9 @@ public class SecurityConfig {
     }
 
     @Bean
-    public AuthenticationManager authenticationManager(AuthenticationConfiguration config) throws Exception {
+    public AuthenticationManager authenticationManager(
+            AuthenticationConfiguration config
+    ) throws Exception {
         return config.getAuthenticationManager();
     }
 }

@@ -73,13 +73,18 @@ class AuthServiceImplTest {
         Authentication okAuth = new UsernamePasswordAuthenticationToken("john", null);
         when(authManager.authenticate(any())).thenReturn(okAuth);
         when(userRepository.findByUsername("john"))
-                .thenReturn(Optional.of(User.builder().username("john").role(Role.ROLE_ADMIN).build()));
-        when(jwtService.generateToken(eq("john"), any(Map.class))).thenReturn("JWT-TOKEN");
+                .thenReturn(Optional.of(User.builder()
+                        .username("john")
+                        .role(Role.ROLE_ADMIN)
+                        .build()));
+        when(jwtService.generateToken(eq("john"), any(Map.class)))
+                .thenReturn("JWT-TOKEN");
 
         AuthResponse res = service.login(req);
 
         assertThat(res.getToken()).isEqualTo("JWT-TOKEN");
-        verify(jwtService).generateToken(eq("john"), argThat(m -> "ROLE_ADMIN".equals(m.get("role"))));
+        verify(jwtService).generateToken(eq("john"),
+                argThat(m -> "ROLE_ADMIN".equals(m.get("role"))));
     }
 
     @Test
@@ -87,20 +92,32 @@ class AuthServiceImplTest {
         LoginRequest req = new LoginRequest();
         req.setUsername("john");
         req.setPassword("bad");
-        when(authManager.authenticate(any())).thenThrow(new BadCredentialsException("bad"));
-
-        assertThrows(BadCredentialsException.class, () -> service.login(req));
-    }
-    @Test
-    void login_shouldThrowWhenUsernameNotFound() {
-        LoginRequest req = new LoginRequest();
-        req.setUsername("unknown");
-        req.setPassword("any");
 
         when(authManager.authenticate(any()))
-                .thenThrow(new BadCredentialsException("Bad credentials"));
+                .thenThrow(new BadCredentialsException("bad"));
 
         assertThrows(BadCredentialsException.class, () -> service.login(req));
     }
+
+    @Test
+    void login_shouldThrowBadCredentials_whenUserNotFoundAfterSuccessfulAuth() {
+        LoginRequest req = new LoginRequest();
+        req.setUsername("ghost");
+        req.setPassword("any");
+
+        // 1) authManager.authenticate thành công
+        Authentication okAuth = new UsernamePasswordAuthenticationToken("ghost", null);
+        when(authManager.authenticate(any())).thenReturn(okAuth);
+
+        // 2) nhưng repository không tìm thấy user
+        when(userRepository.findByUsername("ghost")).thenReturn(Optional.empty());
+
+        // 3) service phải ném BadCredentialsException (401) như mong đợi
+        assertThrows(BadCredentialsException.class, () -> service.login(req));
+
+        // không được generate JWT với user không tồn tại
+        verify(jwtService, never()).generateToken(anyString(), any(Map.class));
+    }
+
 
 }
