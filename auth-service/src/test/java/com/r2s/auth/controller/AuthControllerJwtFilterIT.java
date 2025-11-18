@@ -15,11 +15,16 @@ import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMock
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.test.mock.mockito.MockBean;
 import org.springframework.context.annotation.Import;
-import org.springframework.http.MediaType;
+import org.springframework.test.context.ActiveProfiles;
+import org.springframework.test.context.DynamicPropertyRegistry;
+import org.springframework.test.context.DynamicPropertySource;
 import org.springframework.security.authentication.BadCredentialsException;
 import org.springframework.security.core.userdetails.UserDetailsService;
-import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.web.servlet.MockMvc;
+
+import org.testcontainers.containers.PostgreSQLContainer;
+import org.testcontainers.junit.jupiter.Container;
+import org.testcontainers.junit.jupiter.Testcontainers;
 
 import static org.hamcrest.Matchers.containsString;
 import static org.mockito.ArgumentMatchers.any;
@@ -27,16 +32,18 @@ import static org.mockito.BDDMockito.given;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.springframework.http.MediaType.APPLICATION_JSON;
-import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
 
 @SpringBootTest
 @AutoConfigureMockMvc   // bật full filter chain
 @ActiveProfiles("test")
 @Import(JwtFilter.class)
+@Testcontainers
 class AuthControllerJwtFilterIT {
 
     private static final String BASE = "/api/v1/auth";
+    private static final String DUMMY_TOKEN = "any.jwt.token";
 
     @Autowired MockMvc mockMvc;
     @Autowired ObjectMapper objectMapper;
@@ -44,6 +51,31 @@ class AuthControllerJwtFilterIT {
     @MockBean JwtService jwtService;
     @MockBean UserDetailsService userDetailsService;
     @MockBean AuthService authService;
+
+    // ====== Testcontainers Postgres cho profile test ======
+    @Container
+    static PostgreSQLContainer<?> postgres =
+            new PostgreSQLContainer<>("postgres:16-alpine")
+                    .withDatabaseName("user_access_management")
+                    .withUsername("postgres")
+                    .withPassword("d433221dat");
+
+    @DynamicPropertySource
+    static void overrideProps(DynamicPropertyRegistry registry) {
+        registry.add("spring.datasource.url", postgres::getJdbcUrl);
+        registry.add("spring.datasource.username", postgres::getUsername);
+        registry.add("spring.datasource.password", postgres::getPassword);
+    }
+
+    // ===== helper cho JWT =====
+    private String bearerFor(String username, String role) {
+        given(jwtService.isSignatureAndExpiryValid(DUMMY_TOKEN)).willReturn(true);
+        given(jwtService.extractUsername(DUMMY_TOKEN)).willReturn(username);
+        given(jwtService.extractRole(DUMMY_TOKEN)).willReturn(role);
+        return "Bearer " + DUMMY_TOKEN;
+    }
+
+    // ===== các test cũ giữ nguyên =====
 
     @Test
     @DisplayName("POST /auth/register: valid body → 200 OK + message, gọi service")
@@ -116,5 +148,49 @@ class AuthControllerJwtFilterIT {
                         .content(objectMapper.writeValueAsString(req)))
                 .andExpect(status().isUnauthorized())
                 .andExpect(content().string(containsString("Invalid username or password")));
+    }
+
+    // ===== test BỔ SUNG cho admin-only / quyền =====
+
+    @Test
+    @DisplayName("GET /auth/admin-only: thiếu Authorization header → 401")
+    void adminOnly_should401_whenMissingAuthorization() throws Exception {
+        mockMvc.perform(get(BASE + "/admin-only"))
+                .andExpect(status().isUnauthorized());
+
+        // endpoint này không dùng AuthService, đảm bảo không bị đụng
+        verifyNoInteractions(authService);
+    }
+
+    @Test
+    @DisplayName("GET /auth/admin-only: role USER → 403 FORBIDDEN")
+    void adminOnly_should403_forUserRole() throws Exception {
+        String authHeader = bearerFor("alice", "ROLE_USER");
+
+        mockMvc.perform(get(BASE + "/admin-only")
+                        .header("Authorization", authHeader))
+                .andExpect(status().isForbidden());
+    }
+
+    @Test
+    @DisplayName("GET /auth/admin-only: role ADMIN → 200 OK + body \"ADMIN area\"")
+    void adminOnly_should200_forAdminRole() throws Exception {
+        String authHeader = bearerFor("admin", "ROLE_ADMIN");
+
+        mockMvc.perform(get(BASE + "/admin-only")
+                        .header("Authorization", authHeader))
+                .andExpect(status().isOk())
+                .andExpect(content().string("ADMIN area"));
+    }
+
+    @Test
+    @DisplayName("GET /auth/admin-only: token invalid → 401")
+    void adminOnly_should401_whenTokenInvalid() throws Exception {
+        String badToken = "bad.jwt.token";
+        given(jwtService.isSignatureAndExpiryValid(badToken)).willReturn(false);
+
+        mockMvc.perform(get(BASE + "/admin-only")
+                        .header("Authorization", "Bearer " + badToken))
+                .andExpect(status().isUnauthorized());
     }
 }

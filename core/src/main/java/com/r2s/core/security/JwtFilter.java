@@ -35,8 +35,13 @@ public class JwtFilter extends OncePerRequestFilter {
         String path = request.getServletPath();
 
         // 1) Bỏ qua hoàn toàn cho các endpoint public: login/register, swagger, actuator...
-        if (path.startsWith("/api/v1/auth")
-                || path.startsWith("/auth")
+        boolean isPublicAuthEndpoint =
+                path.equals("/api/v1/auth/register") ||
+                        path.equals("/api/v1/auth/login")    ||
+                        path.equals("/auth/register")        ||
+                        path.equals("/auth/login");
+
+        if (isPublicAuthEndpoint
                 || path.startsWith("/actuator")
                 || path.startsWith("/error")
                 || path.startsWith("/v3/api-docs")
