@@ -1,0 +1,111 @@
+stages:
+  - build      # 1) Build JAR
+  - test       # 2) Chạy test + report
+  - deploy     # 3) Deploy bằng Docker
+
+# Biến dùng chung
+variables:
+  MAVEN_OPTS: "-Dmaven.repo.local=.m2/repository"
+
+  # Spring profile & DB
+  SPRING_PROFILES_ACTIVE: "docker"
+
+  POSTGRES_USER: "postgres"
+  POSTGRES_PASSWORD: "d433221dat"
+
+  AUTH_DB: "auth_service"
+  USER_DB: "user_service"
+
+  SPRING_DATASOURCE_URL_AUTH: "jdbc:postgresql://postgres-db:5432/auth_service"
+  SPRING_DATASOURCE_URL_USER: "jdbc:postgresql://postgres-db:5432/user_service"
+  SPRING_DATASOURCE_USERNAME: "postgres"
+  SPRING_DATASOURCE_PASSWORD: "d433221dat"
+
+  # JWT
+  JWT_SECRET: "w5h2Yk1Gd3dtdkFzT0h0bTFwM05XUnJvV0V1NHVZbU5yZFRyWW9oUUNmQ1hLcw=="
+  JWT_EXP_MINUTES: "120"
+
+cache:
+  key: maven-cache
+  paths:
+    - .m2/repository
+
+# 1) BUILD – build JAR, chưa chạy test
+maven_build:
+  stage: build
+  image: maven:3.9.9-eclipse-temurin-17
+  tags: [ "local" ]       # trùng tag runner em register
+  script:
+    - java -version
+    - mvn -v
+    - mvn -B -DskipTests package
+  artifacts:
+    paths:
+      - auth-service/target/*.jar
+      - user-service/target/*.jar
+
+# 2) TEST – spin up Postgres, tạo DB, chạy test + HTML report
+maven_test:
+  stage: test
+  image: maven:3.9.9-eclipse-temurin-17
+  tags: [ "local" ]
+  services:
+    - name: postgres:15
+      alias: postgres-db
+  script:
+    - java -version
+    - mvn -v
+
+    # Cài psql client
+    - apt-get update && apt-get install -y postgresql-client
+
+    # Chờ Postgres ready
+    - |
+      echo "Waiting for Postgres..."
+      until pg_isready -h postgres-db -p 5432 -U "$POSTGRES_USER"; do
+        echo "  still waiting..."
+        sleep 2
+      done
+      echo "Postgres is ready."
+
+    # Tạo DB auth_service nếu chưa có
+    - |
+      PSQL_URL="postgresql://$POSTGRES_USER:$POSTGRES_PASSWORD@postgres-db:5432/postgres"
+      psql "$PSQL_URL" -tc "SELECT 1 FROM pg_database WHERE datname='$AUTH_DB';" | grep -q 1 \
+        || psql "$PSQL_URL" -c "CREATE DATABASE $AUTH_DB;"
+
+    # Tạo DB user_service nếu chưa có
+    - |
+      psql "$PSQL_URL" -tc "SELECT 1 FROM pg_database WHERE datname='$USER_DB';" | grep -q 1 \
+        || psql "$PSQL_URL" -c "CREATE DATABASE $USER_DB;"
+
+    # Chạy test toàn bộ, bỏ qua E2E cần Docker Compose
+    - >
+      mvn -B clean test surefire-report:report
+      -DfailIfNoTests=false
+      -Dsurefire.failIfNoSpecifiedTests=false
+      -Dtest='*Test,!AuthE2EFlowTest,!E2EFlowTest'
+  artifacts:
+    when: always
+    paths:
+      - auth-service/target/surefire-reports
+      - user-service/target/surefire-reports
+      - auth-service/target/site
+      - user-service/target/site
+
+# 3) DEPLOY – Docker compose lên localhost (runner local)
+docker_deploy:
+  stage: deploy
+  image: docker:27
+  tags: [ "local" ]
+  services:
+    - name: docker:27-dind
+  variables:
+    DOCKER_HOST: tcp://docker:2375
+    DOCKER_TLS_CERTDIR: ""
+  script:
+    - docker version
+    # Dừng stack cũ (nếu có)
+    - docker compose down || true
+    # Build lại image + chạy lên
+    - docker compose up -d --build

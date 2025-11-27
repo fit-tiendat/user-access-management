@@ -1,114 +1,63 @@
 # User Access Management
 
-Mono-repo quản lý **người dùng** và **phân quyền** gồm 3 module chính:
+Mono-repo gồm 3 module:
+- `core` – entity/common utils
+- `auth-service` – đăng ký/đăng nhập/JWT
+- `user-service` – quản lý người dùng & hồ sơ
 
-- `core` – entity, repository, security (JWT), exception dùng chung
-- `auth-service` – đăng ký / đăng nhập / phát hành JWT
-- `user-service` – quản lý hồ sơ người dùng (profile), API cho USER & ADMIN
-
-Repo đã **dockerize đầy đủ** (Postgres + 2 service) và có test **unit / webmvc / integration với Testcontainers**.
+Repo đã **dockerize** đầy đủ (Postgres + 2 service) và tài liệu hóa cách dùng **pgAdmin** để truy cập DB trong container.
 
 ---
 
 ## 🧭 Mục lục
-
-- [1. Yêu cầu](#1-yêu-cầu)
-- [2. Công nghệ sử dụng](#2-công-nghệ-sử-dụng)
-- [3. Cấu trúc thư mục](#3-cấu-trúc-thư-mục)
-- [4. Biến môi trường](#4-biến-môi-trường)
-- [5. Build & chạy bằng Docker](#5-build--chạy-bằng-docker)
-- [6. Smoke test nhanh](#6-smoke-test-nhanh)
-- [7. Kết nối vào Postgres trong container](#7-kết-nối-vào-postgres-trong-container)
-- [8. Test & chất lượng code](#8-test--chất-lượng-code)
-- [9. Ghi chú phát triển](#9-ghi-chú-phát-triển)
+- [Yêu cầu](#yêu-cầu)
+- [Cấu trúc](#cấu-trúc)
+- [Biến môi trường](#biến-môi-trường)
+- [Build & chạy](#build--chạy)
+- [Kiểm tra nhanh (smoke tests)](#kiểm-tra-nhanh-smoke-tests)
+- [Kết nối DB trong container](#kết-nối-db-trong-container)
+    - [pgAdmin (khuyến nghị)](#pgadmin-khuyến-nghị)
+    - [DBeaver (lưu ý TimeZone)](#dbeaver-lưu-ý-timezone)
+    - [psql (dòng lệnh)](#psql-dòng-lệnh)
+- [Volumes & dữ liệu bền vững](#volumes--dữ-liệu-bền-vững)
+- [Troubleshooting](#troubleshooting)
+- [Ghi chú phát triển](#ghi-chú-phát-triển)
 
 ---
 
-## 1. Yêu cầu
-
+## Yêu cầu
 - **JDK 17+**
 - **Maven 3.9+**
 - **Docker Desktop** (Compose v2)
-- Tuỳ chọn:
-  - **pgAdmin 4** hoặc **DBeaver** để xem DB
-  - **curl / Postman / Insomnia** để call API
+- (Tùy chọn) **pgAdmin 4** hoặc **DBeaver**
 
 ---
 
-## 2. Công nghệ sử dụng
-
-- **Spring Boot 3.5.x**
-- **Spring Security 6** + JWT (stateless)
-- **Spring Data JPA** (Hibernate)
-- **PostgreSQL**
-- **Testcontainers** (integration test với PostgreSQL thật)
-- **JUnit 5**, **Mockito**, **Spring MVC Test (MockMvc)**
-- **Docker / Docker Compose**
-- **springdoc-openapi** (Swagger UI)
-
----
-
-## 3. Cấu trúc thư mục
-
-```text
+## Cấu trúc
 user-access-manament/
 ├─ core/
-│  ├─ src/main/java/com/r2s/core/
-│  │  ├─ entity/           # User, Role, Profile base...
-│  │  ├─ repository/
-│  │  ├─ security/         # JwtService, JwtFilter, CustomUserDetailsService
-│  │  └─ exception/        # CustomException, GlobalExceptionHandler, ...
-│  └─ src/test/java/com/r2s/core/security/
-│     ├─ JwtServiceTest.java
-│     ├─ JwtFilterTest.java
-│     └─ CustomUserDetailsServiceTest.java
-│
 ├─ auth-service/
-│  ├─ src/main/java/com/r2s/auth/
-│  │  ├─ config/           # SecurityConfig
-│  │  ├─ controller/       # AuthController, RoleController
-│  │  ├─ dto/
-│  │  ├─ exception/        # ApiExceptionHandler, SecurityExceptionHandler
-│  │  └─ service/          # AuthServiceImpl
-│  ├─ src/test/java/com/r2s/auth/
-│  │  ├─ controller/       # AuthControllerWebMvcTest, AuthControllerJwtFilterIT
-│  │  ├─ service/          # AuthServiceImplTest
-│  │  └─ e2e/              # AuthE2EFlowTest (RestAssured + Testcontainers)
-│  ├─ src/main/resources/
-│  │  ├─ application.properties
-│  │  ├─ application-docker.properties
-│  │  └─ application-test.properties
-│  ├─ Dockerfile
-│  └─ .dockerignore
-│
+│ ├─ src/main/resources/
+│ │ ├─ application.properties
+│ │ └─ application-docker.properties
+│ ├─ Dockerfile
+│ └─ .dockerignore
 ├─ user-service/
-│  ├─ src/main/java/com/r2s/user/
-│  │  ├─ controller/       # ProfileController
-│  │  ├─ dto/              # ProfileDto, ProfileResponse
-│  │  ├─ entity/           # Profile
-│  │  ├─ exception/        # ApiExceptionHandler (dịch NotFoundException...)
-│  │  └─ service/          # ProfileService, ProfileServiceImpl
-│  ├─ src/test/java/com/r2s/user/
-│  │  ├─ controller/       # ProfileControllerWebMvcTest
-│  │  └─ service/          # ProfileServiceImplIT (Testcontainers)
-│  ├─ src/main/resources/
-│  │  ├─ application.properties
-│  │  └─ application-docker.properties
-│  ├─ Dockerfile
-│  └─ .dockerignore
-│
+│ ├─ src/main/resources/
+│ │ ├─ application.properties
+│ │ └─ application-docker.properties
+│ ├─ Dockerfile
+│ └─ .dockerignore
 ├─ postgres/
-│  └─ init.sql             # tạo DB auth_service, user_service, user mẫu...
-│
+│ └─ init.sql # tạo DB auth_service, user_service khi lần đầu dựng
 ├─ docker-compose.yaml
-├─ .env                    # cấu hình Postgres (host)
+├─ .env # biến môi trường DB
 └─ README.md
-4. Biến môi trường
-4.1. File .env (cho Docker Compose)
-File .env nằm ở root, ví dụ:
 
-env
-Sao chép mã
+
+## Biến môi trường
+Tạo file `.env` (đã có mẫu trong repo). Điều chỉnh nếu cần:
+```env
 POSTGRES_USER=postgres
 POSTGRES_PASSWORD=d433221dat
 POSTGRES_DB=postgres
@@ -116,95 +65,61 @@ POSTGRES_DB=postgres
 # Port mapping cho Postgres container (host:container)
 POSTGRES_PORT_HOST=55432
 POSTGRES_PORT_CONTAINER=5432
-Mặc định map 55432 → 5432 để tránh đụng Postgres local.
+Mặc định map 55432 → 5432 để tránh đụng CSDL Postgres đang chạy local.
 
-4.2. Biến ứng dụng (JWT, profile…)
-Các service dùng chung một số biến:
-
-env
-Sao chép mã
-# JWT
-JWT_SECRET=w5h2Yk1Gd3dtdkFzT0h0bTFwM05XUnJvV0V1NHVZbU5yZFRyWW9oUUNmQ1hLcw==
-JWT_EXP_MINUTES=120
-
-# Spring profile khi chạy Docker
-SPRING_PROFILES_ACTIVE=docker
-Khi chạy bằng Docker Compose, các biến này thường được set trong
-application-docker.properties + docker-compose.yaml.
-Khi chạy local, có thể override qua VM options / ENV.
-
-5. Build & chạy bằng Docker
-5.1. Build Maven (tất cả module)
+Build & chạy
+1) Build jar (bỏ qua test nếu muốn)
 bash
 Sao chép mã
-mvn clean package -DskipTests
-5.2. Dựng toàn bộ stack
+mvn -q -DskipTests clean package
+2) Dựng toàn bộ stack
 bash
 Sao chép mã
 docker compose up --build
-Sau khi lên thành công:
+Sau khi thành công:
 
-auth-service chạy ở: http://localhost:8081
+auth-service: http://localhost:8081
 
-user-service chạy ở: http://localhost:8082
+user-service: http://localhost:8082
 
-Postgres lắng nghe ở: 127.0.0.1:55432
+postgres: lắng nghe trên 127.0.0.1:55432
 
-5.3. Dừng container
-Giữ lại data:
-
+3) Dừng & xóa container (giữ data)
 bash
 Sao chép mã
 docker compose down
-Xoá luôn data volume:
+Muốn xóa cả data volume: docker compose down -v
 
+Kiểm tra nhanh (smoke tests)
+1) Đăng ký & đăng nhập
 bash
 Sao chép mã
-docker compose down -v
-6. Smoke test nhanh
-Mặc định base-path API là /api/v1.
-
-6.1. Đăng ký & đăng nhập (auth-service)
-bash
-Sao chép mã
-# Register USER
-curl -s -X POST http://localhost:8081/api/v1/auth/register \
+# Register
+curl -s -X POST http://localhost:8081/auth/register \
   -H "Content-Type: application/json" \
-  -d '{"username":"testuser1","password":"123456"}'
+  -d '{"username":"test user1","password":"123456"}'
 
-# Register ADMIN
-curl -s -X POST http://localhost:8081/api/v1/auth/register \
+curl -s -X POST http://localhost:8081/auth/register \
   -H "Content-Type: application/json" \
-  -d '{"username":"admin1","password":"123456","role":"ROLE_ADMIN"}'
+  -d '{"username":"test user2","password":"123456","role":"ROLE_ADMIN"}'
 
-# Login (lấy JWT)
-TOKEN=$(curl -s -X POST http://localhost:8081/api/v1/auth/login \
+# Login (nhận JWT)
+TOKEN=$(curl -s -X POST http://localhost:8081/auth/login \
   -H "Content-Type: application/json" \
-  -d '{"username":"admin1","password":"123456"}' | jq -r .token)
-
+  -d '{"username":"test user1","password":"123456"}' | jq -r .token)
 echo "$TOKEN"
-6.2. Gọi API có bảo vệ JWT
-Ví dụ: ADMIN xem danh sách profile trong user-service:
-
+2) Gọi API cần Bearer token
 bash
 Sao chép mã
-curl -s http://localhost:8082/api/v1/users \
+curl -s http://localhost:8082/users \
   -H "Authorization: Bearer $TOKEN"
-USER tự xem profile của mình:
-
-bash
-Sao chép mã
-curl -s http://localhost:8082/api/v1/users/me \
-  -H "Authorization: Bearer $TOKEN"
-7. Kết nối vào Postgres trong container
-Container DB được đặt tên (ví dụ) là postgres-db trong docker-compose.yaml.
-
-7.1. Kết nối bằng pgAdmin (khuyến nghị)
+Kết nối DB trong container
+pgAdmin (khuyến nghị)
 Mở pgAdmin → Register → Server…
 
 Tab General
 
-Name: docker-postgres (55432) (tuỳ bạn đặt)
+Name: docker-postgres (55432) (tuỳ)
 
 Tab Connection
 
@@ -216,122 +131,114 @@ Maintenance DB: postgres
 
 Username: postgres
 
-Password: giống trong .env (d433221dat)
+Password: (lấy từ .env, mặc định d433221dat)
 
 Save → Connect
 
-Mở DB auth_service hoặc user_service → Query Tool:
+Mở database auth_service hoặc user_service → Query Tool:
 
 sql
 Sao chép mã
-SELECT * FROM users;
-7.2. Kết nối bằng DBeaver
-Lưu ý TimeZone:
+select * from users;
+Bạn sẽ thấy các user vừa đăng ký (test user1, test user2) nếu tạo qua API.
 
-Không dùng Asia/Saigon (Postgres không chấp nhận)
+DBeaver (lưu ý TimeZone)
+KHÔNG đặt TimeZone=Asia/Saigon (PostgreSQL không nhận).
 
-Nếu cần, dùng Asia/Ho_Chi_Minh hoặc bỏ hẳn tham số TimeZone
+Nếu cần TZ, dùng Asia/Ho_Chi_Minh hoặc bỏ hẳn tham số TimeZone.
 
-Thông số:
+Thông số kết nối:
 
 Host: 127.0.0.1
 
 Port: 55432
 
-Database: auth_service hoặc user_service
+Database: auth_service (hoặc user_service)
 
-User/Pass: trong .env
+User/Pass: theo .env
 
-7.3. Kết nối bằng psql (dòng lệnh)
-Liệt kê DB:
-
+psql (dòng lệnh)
 bash
 Sao chép mã
+# Liệt kê DB
 docker exec -it postgres-db psql -U postgres -c "\l"
-Query nhanh:
 
-bash
-Sao chép mã
+# Query nhanh
 docker exec -it postgres-db psql -U postgres -d auth_service \
-  -c "SELECT id, username, role FROM users ORDER BY id DESC LIMIT 5;"
-8. Test & chất lượng code
-8.1. Chạy toàn bộ test
+  -c "select id, username from users order by id desc limit 5;"
+Volumes & dữ liệu bền vững
+Compose tạo volume tên: user-access-manament_postgres_data
+
+Xem vị trí (host):
+
 bash
 Sao chép mã
-mvn test
-8.2. Các nhóm test chính
-core module
+docker volume inspect user-access-manament_postgres_data
+Xóa sạch dữ liệu DB:
 
-JwtServiceTest – sinh / verify JWT, claim role
+bash
+Sao chép mã
+docker compose down -v
+Troubleshooting
+1) no main manifest attribute, in /app/app.jar
+Đảm bảo dùng Spring Boot Maven Plugin (đóng gói kiểu Boot jar).
 
-JwtFilterTest – behavior filter khi:
+MANIFEST kiểm tra phải có:
 
-thiếu token
+pgsql
+Sao chép mã
+Main-Class: org.springframework.boot.loader.launch.JarLauncher
+Start-Class: com.r2s.auth.AuthServiceApplication
+Lệnh kiểm tra:
 
-token invalid / hết hạn
+bash
+Sao chép mã
+jar tf auth-service/target/auth-service-1.0.0-SNAPSHOT.jar | Select-String MANIFEST.MF
+jar xf auth-service/target/auth-service-1.0.0-SNAPSHOT.jar META-INF/MANIFEST.MF
+type META-INF/MANIFEST.MF
+2) Lỗi Docker build: lstat /target: no such file or directory
+Bạn chạy docker compose up --build khi chưa build Maven.
+→ Chạy lại: mvn -q -DskipTests clean package rồi mới compose.
 
-token hợp lệ → set Authentication vào SecurityContext
+3) DBeaver báo: FATAL: invalid value for parameter "TimeZone": "Asia/Saigon"
+Dùng Asia/Ho_Chi_Minh hoặc bỏ tham số TimeZone trong Driver Properties.
 
-CustomUserDetailsServiceTest – load user từ DB
+4) Không kết nối được Postgres từ pgAdmin/DBeaver
+Đảm bảo container postgres-db đang Up:
 
-auth-service
+bash
+Sao chép mã
+docker ps
+Đúng port: 127.0.0.1:55432
 
-AuthServiceImplTest – unit test cho đăng ký / đăng nhập
+Warinings Connection refused → coi lại firewall/antivirus chặn port.
 
-AuthControllerWebMvcTest – slice test cho /api/v1/auth/** (validation, response)
+5) DB hiển thị dữ liệu “cũ”
+Bạn có thể đang kết nối nhầm local 5432 thay vì container 55432.
 
-AuthControllerJwtFilterIT – integration test:
+Kiểm tra lại server config trong tool, hoặc \conninfo (psql).
 
-thiếu Authorization → 401 Unauthorized
-
-token hợp lệ nhưng sai role → 403 Forbidden
-
-token hợp lệ + đúng role → 200 OK
-
-user-service
-
-ProfileControllerWebMvcTest
-
-GET /api/v1/users – chỉ ADMIN; kiểm tra format JSON
-
-GET /api/v1/users/me – dùng @WithMockUser
-
-PUT /api/v1/users/me – validate email, ép username từ token
-
-DELETE /api/v1/users/{username} – mapping NotFoundException → 404
-
-ProfileServiceImplIT – integration test với Testcontainers Postgres
-
-Tất cả integration test profile test đều sử dụng Testcontainers → không phụ thuộc vào DB local.
-
-9. Ghi chú phát triển
-Security
-
-Stateless JWT, SessionCreationPolicy.STATELESS
-
-Chỉ mở:
-
-/api/v1/auth/register, /api/v1/auth/login
-
-/actuator/health, /actuator/info
-
-swagger: /swagger-ui/**, /v3/api-docs/**
-
-Còn lại yêu cầu JWT hợp lệ.
-
-Thiếu token / token invalid → 401 Unauthorized
-Có token nhưng thiếu quyền (sai role) → 403 Forbidden.
-
-Swagger UI
-
-Auth-service: http://localhost:8081/swagger-ui.html
-
-User-service: http://localhost:8082/swagger-ui.html
-
-Dockerfile (các service)
+Ghi chú phát triển
+Hồ sơ Docker:
 
 Base image: eclipse-temurin:17-jre
 
-Copy jar → /app/app.jar
+Copy final jar → /app/app.jar
 
 ENTRYPOINT ["java","-jar","/app/app.jar"]
+
+Hồ sơ Compose:
+
+postgres (15), port map 55432:5432
+
+auth-service (8081), user-service (8082)
+
+Volume user-access-manament_postgres_data giữ data lâu dài
+
+License
+Internal project. All rights reserved.
+
+css
+Sao chép mã
+
+> Nếu bạn muốn mình sinh thêm file `docs/db-admin/PGADMIN.md`/`postgres/README.md` tách riêng theo đúng format nội bộ, nói mình viết tiếp nhé.
