@@ -136,8 +136,8 @@ jobs:
       # Giả sử em đã có sẵn file .env trong repo, docker-compose sẽ dùng các biến đó
       - name: Start stack with Docker Compose
         run: |
-          docker compose pull || true
-          docker compose up -d
+          docker compose pull
+          docker compose up -d --build
 
       - name: Show running containers
         run: docker ps
