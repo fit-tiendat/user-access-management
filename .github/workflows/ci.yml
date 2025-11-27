@@ -9,11 +9,25 @@ on:
 env:
   OWNER: ${{ github.repository_owner }}
 
-# =========================
-# 1) BUILD  (Maven package, skip tests)
-# =========================
+  # ==== ENV dùng chung cho test ====
+  SPRING_PROFILES_ACTIVE: docker
+  POSTGRES_USER: postgres
+  POSTGRES_PASSWORD: d433221dat
+  AUTH_DB: auth_service
+  USER_DB: user_service
+  SPRING_DATASOURCE_URL_AUTH: jdbc:postgresql://postgres-db:5432/auth_service
+  SPRING_DATASOURCE_URL_USER: jdbc:postgresql://postgres-db:5432/user_service
+  SPRING_DATASOURCE_USERNAME: postgres
+  SPRING_DATASOURCE_PASSWORD: d433221dat
+  JWT_SECRET: w5h2Yk1Gd3dtdkFzT0h0bTFwM05XUnJvV0V1NHVZbU5yZFRyWW9oUUNmQ1hLcw==
+  JWT_EXP_MINUTES: 120
+
+# ============================================================
+# 1) BUILD  – chỉ build JAR, không chạy test
+# ============================================================
 jobs:
   build:
+    name: Build (mvn package -DskipTests)
     runs-on: ubuntu-latest
 
     steps:
@@ -27,16 +41,16 @@ jobs:
           java-version: 17
           cache: maven
 
-      # Build toàn bộ project, bỏ qua test
       - name: Maven package (skip tests)
-        run: mvn -B -DskipTests package
+        run: mvn -B -DskipTests clean package
 
-  # =========================
-  # 2) TEST  (unit + integration, có Postgres)
-  # =========================
+  # ============================================================
+  # 2) TEST  – dùng Postgres service + chạy test, bỏ qua E2E
+  # ============================================================
   test:
+    name: Test (skip E2E, generate HTML report)
     runs-on: ubuntu-latest
-    needs: build          # chạy sau build
+    needs: build
 
     services:
       postgres-db:
@@ -52,19 +66,6 @@ jobs:
           --health-timeout=5s
           --health-retries=5
 
-    env:
-      SPRING_PROFILES_ACTIVE: docker
-      POSTGRES_USER: postgres
-      POSTGRES_PASSWORD: d433221dat
-      AUTH_DB: auth_service
-      USER_DB: user_service
-      SPRING_DATASOURCE_URL_AUTH: jdbc:postgresql://postgres-db:5432/auth_service
-      SPRING_DATASOURCE_URL_USER: jdbc:postgresql://postgres-db:5432/user_service
-      SPRING_DATASOURCE_USERNAME: postgres
-      SPRING_DATASOURCE_PASSWORD: d433221dat
-      JWT_SECRET: w5h2Yk1Gd3dtdkFzT0h0bTFwM05XUnJvV0V1NHVZbU5yZFRyWW9oUUNmQ1hLcw==
-      JWT_EXP_MINUTES: 120
-
     steps:
       - name: Checkout source
         uses: actions/checkout@v4
@@ -76,7 +77,6 @@ jobs:
           java-version: 17
           cache: maven
 
-      # Cài psql client & tạo DB auth_service + user_service
       - name: Install Postgres client & create databases
         run: |
           sudo apt-get update
@@ -101,15 +101,13 @@ jobs:
         env:
           PGPASSWORD: d433221dat
 
-      # Chạy test, bỏ qua các E2E cần Docker-in-Docker
       - name: Run Maven tests + HTML report (skip E2E)
         run: |
-          mvn -B test surefire-report:report \
+          mvn -B clean test surefire-report:report \
             -DfailIfNoTests=false \
             -Dsurefire.failIfNoSpecifiedTests=false \
             -Dtest='*Test,!AuthE2EFlowTest,!E2EFlowTest'
 
-      # Upload JUnit XML + HTML (Surefire report)
       - name: Upload test reports (JUnit XML + HTML)
         if: always()
         uses: actions/upload-artifact@v4
@@ -119,30 +117,27 @@ jobs:
             **/target/surefire-reports
             **/target/site
 
-  # =========================
-  # 3) DEPLOY (Build Docker images)
-  # =========================
-  docker:
-    name: Build Docker images
-    runs-on: ubuntu-latest
-    needs: test                 # chỉ chạy khi build + test OK
+  # ============================================================
+  # 3) DEPLOY – chạy docker compose trên máy em (self-hosted runner)
+  #    Sau bước này Postman có thể gọi localhost:8081 / 8082
+  # ============================================================
+  deploy:
+    name: Deploy to local Docker (for Postman)
+    needs: test
+    # chỉ deploy khi push lên nhánh datnt (hoặc đổi thành main nếu muốn)
     if: github.ref == 'refs/heads/datnt'
+    # phải dùng self-hosted runner thì container mới nằm trên máy em
+    runs-on: self-hosted
 
     steps:
       - name: Checkout source
         uses: actions/checkout@v4
 
-      - name: Build auth-service image
+      # Giả sử em đã có sẵn file .env trong repo, docker-compose sẽ dùng các biến đó
+      - name: Start stack with Docker Compose
         run: |
-          docker build -t user-access-management-auth-service:${{ github.sha }} \
-            -f auth-service/Dockerfile .
+          docker compose pull || true
+          docker compose up -d
 
-      - name: Build user-service image
-        run: |
-          docker build -t user-access-management-user-service:${{ github.sha }} \
-            -f user-service/Dockerfile .
-
-      # (TẠM THỜI) Bỏ qua push lên registry vì bị giới hạn quyền
-      # - name: Push images
-      #   run: |
-      #     docker push ...
+      - name: Show running containers
+        run: docker ps
