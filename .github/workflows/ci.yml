@@ -39,16 +39,25 @@ jobs:
     runs-on: ubuntu-latest
     needs: build
 
+    # ENV dùng cho job test
     env:
       SPRING_PROFILES_ACTIVE: docker
 
+      # tên DB lấy từ repo variables
       AUTH_DB: ${{ vars.AUTH_DB }}
       USER_DB: ${{ vars.USER_DB }}
 
+      # credentials lấy từ secrets -> env thường
+      DB_USER: ${{ secrets.DB_USER }}
+      DB_PASSWORD: ${{ secrets.DB_PASSWORD }}
+
+      # Spring datasource cho test
       SPRING_DATASOURCE_URL_AUTH: jdbc:postgresql://postgres-db:5432/${{ vars.AUTH_DB }}
       SPRING_DATASOURCE_URL_USER: jdbc:postgresql://postgres-db:5432/${{ vars.USER_DB }}
       SPRING_DATASOURCE_USERNAME: ${{ secrets.DB_USER }}
       SPRING_DATASOURCE_PASSWORD: ${{ secrets.DB_PASSWORD }}
+
+      # JWT
       JWT_SECRET: ${{ secrets.JWT_SECRET }}
       JWT_EXP_MINUTES: 120
 
@@ -56,12 +65,13 @@ jobs:
       postgres-db:
         image: postgres:15
         env:
-          POSTGRES_USER: ${{ secrets.DB_USER }}
-          POSTGRES_PASSWORD: ${{ secrets.DB_PASSWORD }}
+          # ❗ Ở đây dùng env.DB_USER / env.DB_PASSWORD, KHÔNG dùng secrets.*
+          POSTGRES_USER: ${{ env.DB_USER }}
+          POSTGRES_PASSWORD: ${{ env.DB_PASSWORD }}
         ports:
           - "5432:5432"
         options: >-
-          --health-cmd="pg_isready -U ${{ secrets.DB_USER }}"
+          --health-cmd="pg_isready -U ${{ env.DB_USER }}"
           --health-interval=10s
           --health-timeout=5s
           --health-retries=5
@@ -99,8 +109,9 @@ jobs:
           psql -h localhost -p 5432 -U "${DB_USER}" -tc "SELECT 1 FROM pg_database WHERE datname='${USER_DB}';" | grep -q 1 || \
             psql -h localhost -p 5432 -U "${DB_USER}" -c "CREATE DATABASE ${USER_DB};"
         env:
-          DB_USER: ${{ secrets.DB_USER }}
-          PGPASSWORD: ${{ secrets.DB_PASSWORD }}
+          # bước này có thể dùng lại env.* (đã map từ secrets ở trên)
+          DB_USER: ${{ env.DB_USER }}
+          PGPASSWORD: ${{ env.DB_PASSWORD }}
 
       - name: Run Maven tests + HTML report (skip E2E)
         run: |
@@ -133,7 +144,8 @@ jobs:
       SPRING_PROFILES_ACTIVE: docker
       AUTH_DB: ${{ vars.AUTH_DB }}
       USER_DB: ${{ vars.USER_DB }}
-      PG_PORT_HOST: ${{ vars.PG_PORT_HOST }}
+      PG_PORT_HOST: ${{ vars.PG_PORT_HOST }}   # ← 55432 từ repo variables
+
       SPRING_DATASOURCE_USERNAME: ${{ secrets.DB_USER }}
       SPRING_DATASOURCE_PASSWORD: ${{ secrets.DB_PASSWORD }}
       JWT_SECRET: ${{ secrets.JWT_SECRET }}
