@@ -10,7 +10,7 @@ env:
   OWNER: ${{ github.repository_owner }}
 
 # =========================================
-# 1) BUILD  – chỉ build JAR, không chạy test
+# 1) BUILD – chỉ build JAR, không chạy test
 # =========================================
 jobs:
   build:
@@ -32,14 +32,14 @@ jobs:
         run: mvn -B -DskipTests clean package
 
   # =========================================
-  # 2) TEST  – dùng Postgres service + chạy test, bỏ qua E2E
+  # 2) TEST – dùng Postgres service + chạy test, bỏ qua E2E
   # =========================================
   test:
     name: Test (skip E2E, generate HTML report)
     runs-on: ubuntu-latest
     needs: build
 
-    # CHỈ dùng secrets/vars Ở ĐÂY (job env)
+    # ENV dùng cho job test
     env:
       SPRING_PROFILES_ACTIVE: docker
 
@@ -57,12 +57,12 @@ jobs:
       postgres-db:
         image: postgres:15
         env:
-          POSTGRES_USER: postgres
-          POSTGRES_PASSWORD: d433221dat
+          POSTGRES_USER: ${{ secrets.DB_USER }}
+          POSTGRES_PASSWORD: ${{ secrets.DB_PASSWORD }}
         ports:
           - 5432:5432
         options: >-
-          --health-cmd="pg_isready -U postgres"
+          --health-cmd="pg_isready -U ${{ secrets.DB_USER }}"
           --health-interval=10s
           --health-timeout=5s
           --health-retries=5
@@ -92,11 +92,11 @@ jobs:
             sleep 2
           done
 
-          echo "Create auth_service DB if not exists"
+          echo "Create ${AUTH_DB} DB if not exists"
           psql -h localhost -p 5432 -U "${DB_USER}" -tc "SELECT 1 FROM pg_database WHERE datname='${AUTH_DB}';" | grep -q 1 || \
             psql -h localhost -p 5432 -U "${DB_USER}" -c "CREATE DATABASE ${AUTH_DB};"
 
-          echo "Create user_service DB if not exists"
+          echo "Create ${USER_DB} DB if not exists"
           psql -h localhost -p 5432 -U "${DB_USER}" -tc "SELECT 1 FROM pg_database WHERE datname='${USER_DB}';" | grep -q 1 || \
             psql -h localhost -p 5432 -U "${DB_USER}" -c "CREATE DATABASE ${USER_DB};"
         env:
@@ -120,7 +120,7 @@ jobs:
             **/target/site
 
   # =========================================
-  # 3) DEPLOY – chạy docker compose trên máy em
+  # 3) DEPLOY – chạy docker compose trên máy em (self-hosted)
   #    Sau bước này Postman gọi localhost:8081 / 8082
   # =========================================
   deploy:
@@ -129,11 +129,22 @@ jobs:
     if: github.ref == 'refs/heads/datnt'
     runs-on: self-hosted
 
+    # 💡 Ở đây MỚI bơm PG_PORT_HOST (và các env khác) vào,
+    # để docker-compose dùng được giá trị 55432 từ repo variables.
+    env:
+      SPRING_PROFILES_ACTIVE: docker
+      AUTH_DB: ${{ vars.AUTH_DB }}
+      USER_DB: ${{ vars.USER_DB }}
+      PG_PORT_HOST: ${{ vars.PG_PORT_HOST }}
+      SPRING_DATASOURCE_USERNAME: ${{ secrets.DB_USER }}
+      SPRING_DATASOURCE_PASSWORD: ${{ secrets.DB_PASSWORD }}
+      JWT_SECRET: ${{ secrets.JWT_SECRET }}
+      JWT_EXP_MINUTES: 120
+
     steps:
       - name: Checkout source
         uses: actions/checkout@v4
 
-      # Ở đây docker compose dùng file .env của em (PG_PORT_HOST=55432,…)
       - name: Start stack with Docker Compose
         run: |
           docker compose pull
