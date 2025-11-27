@@ -9,7 +9,7 @@ on:
 env:
   OWNER: ${{ github.repository_owner }}
 
-  # ==== ENV dùng chung cho test ====
+  # ==== ENV dùng chung cho job test (CI) ====
   SPRING_PROFILES_ACTIVE: docker
   POSTGRES_USER: postgres
   POSTGRES_PASSWORD: d433221dat
@@ -119,21 +119,22 @@ jobs:
 
   # ============================================================
   # 3) DEPLOY – chạy docker compose trên máy em (self-hosted runner)
-  #    Sau bước này Postman có thể gọi localhost:8081 / 8082
+  #    Sau bước này Postman gọi localhost:8081 / 8082
   # ============================================================
   deploy:
     name: Deploy to local Docker (for Postman)
     needs: test
-    # chỉ deploy khi push lên nhánh datnt (hoặc đổi thành main nếu muốn)
     if: github.ref == 'refs/heads/datnt'
-    # phải dùng self-hosted runner thì container mới nằm trên máy em
     runs-on: self-hosted
+
+    # ⚠️ CHỈ THÊM PHẦN NÀY cho deploy
+    env:
+      PG_PORT_HOST: 55432   # ép docker-compose map 55432:5432
 
     steps:
       - name: Checkout source
         uses: actions/checkout@v4
 
-      # Giả sử em đã có sẵn file .env trong repo, docker-compose sẽ dùng các biến đó
       - name: Start stack with Docker Compose
         run: |
           docker compose pull
