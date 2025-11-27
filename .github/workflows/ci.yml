@@ -9,23 +9,27 @@ on:
 env:
   OWNER: ${{ github.repository_owner }}
 
-  # ==== ENV dùng chung cho test ====
+  # ==== ENV dùng chung cho test / deploy ====
   SPRING_PROFILES_ACTIVE: docker
-  POSTGRES_USER: postgres
-  POSTGRES_PASSWORD: d433221dat
+
+  # lấy từ GitHub Secrets
+  POSTGRES_USER: ${{ secrets.DB_USER }}
+  POSTGRES_PASSWORD: ${{ secrets.DB_PASSWORD }}
+  SPRING_DATASOURCE_USERNAME: ${{ secrets.DB_USER }}
+  SPRING_DATASOURCE_PASSWORD: ${{ secrets.DB_PASSWORD }}
+  JWT_SECRET: ${{ secrets.JWT_SECRET }}
+
+  # mấy cái này không nhạy cảm, để plain cũng được
   AUTH_DB: auth_service
   USER_DB: user_service
   SPRING_DATASOURCE_URL_AUTH: jdbc:postgresql://postgres-db:5432/auth_service
   SPRING_DATASOURCE_URL_USER: jdbc:postgresql://postgres-db:5432/user_service
-  SPRING_DATASOURCE_USERNAME: postgres
-  SPRING_DATASOURCE_PASSWORD: d433221dat
-  JWT_SECRET: w5h2Yk1Gd3dtdkFzT0h0bTFwM05XUnJvV0V1NHVZbU5yZFRyWW9oUUNmQ1hLcw==
   JWT_EXP_MINUTES: 120
 
-# ============================================================
-# 1) BUILD  – chỉ build JAR, không chạy test
-# ============================================================
 jobs:
+  # ============================================================
+  # 1) BUILD  – chỉ build JAR, không chạy test
+  # ============================================================
   build:
     name: Build (mvn package -DskipTests)
     runs-on: ubuntu-latest
@@ -56,12 +60,12 @@ jobs:
       postgres-db:
         image: postgres:15
         env:
-          POSTGRES_USER: postgres
-          POSTGRES_PASSWORD: d433221dat
+          POSTGRES_USER: ${{ secrets.DB_USER }}
+          POSTGRES_PASSWORD: ${{ secrets.DB_PASSWORD }}
         ports:
           - 5432:5432
         options: >-
-          --health-cmd="pg_isready -U postgres"
+          --health-cmd="pg_isready -U ${{ secrets.DB_USER }}"
           --health-interval=10s
           --health-timeout=5s
           --health-retries=5
@@ -84,7 +88,7 @@ jobs:
 
           echo "Waiting for Postgres..."
           for i in {1..30}; do
-            if pg_isready -h localhost -p 5432 -U postgres; then
+            if pg_isready -h localhost -p 5432 -U "$POSTGRES_USER"; then
               echo "Postgres is up!"
               break
             fi
@@ -92,14 +96,14 @@ jobs:
           done
 
           echo "Create auth_service DB if not exists"
-          psql -h localhost -p 5432 -U postgres -tc "SELECT 1 FROM pg_database WHERE datname='auth_service';" | grep -q 1 || \
-            psql -h localhost -p 5432 -U postgres -c "CREATE DATABASE auth_service;"
+          psql -h localhost -p 5432 -U "$POSTGRES_USER" -tc "SELECT 1 FROM pg_database WHERE datname='auth_service';" | grep -q 1 || \
+            psql -h localhost -p 5432 -U "$POSTGRES_USER" -c "CREATE DATABASE auth_service;"
 
           echo "Create user_service DB if not exists"
-          psql -h localhost -p 5432 -U postgres -tc "SELECT 1 FROM pg_database WHERE datname='user_service';" | grep -q 1 || \
-            psql -h localhost -p 5432 -U postgres -c "CREATE DATABASE user_service;"
+          psql -h localhost -p 5432 -U "$POSTGRES_USER" -tc "SELECT 1 FROM pg_database WHERE datname='user_service';" | grep -q 1 || \
+            psql -h localhost -p 5432 -U "$POSTGRES_USER" -c "CREATE DATABASE user_service;"
         env:
-          PGPASSWORD: d433221dat
+          PGPASSWORD: ${{ secrets.DB_PASSWORD }}
 
       - name: Run Maven tests + HTML report (skip E2E)
         run: |
@@ -124,16 +128,14 @@ jobs:
   deploy:
     name: Deploy to local Docker (for Postman)
     needs: test
-    # chỉ deploy khi push lên nhánh datnt (hoặc đổi thành main nếu muốn)
     if: github.ref == 'refs/heads/datnt'
-    # phải dùng self-hosted runner thì container mới nằm trên máy em
     runs-on: self-hosted
 
     steps:
       - name: Checkout source
         uses: actions/checkout@v4
 
-      # Giả sử em đã có sẵn file .env trong repo, docker-compose sẽ dùng các biến đó
+      # ở đây docker-compose dùng .env local của em (có PG_PORT_HOST=55432,…)
       - name: Start stack with Docker Compose
         run: |
           docker compose pull
