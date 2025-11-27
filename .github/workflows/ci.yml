@@ -2,17 +2,17 @@ name: CI/CD
 
 on:
   push:
-    branches: [ main, datnt ]
+    branches: [ "main", "datnt" ]
   pull_request:
-    branches: [ main ]
+    branches: [ "main" ]
 
 env:
   OWNER: ${{ github.repository_owner }}
 
-# =========================================
-# 1) BUILD – chỉ build JAR, không chạy test
-# =========================================
 jobs:
+  # =========================================
+  # 1) BUILD – chỉ build JAR, không chạy test
+  # =========================================
   build:
     name: Build (mvn package -DskipTests)
     runs-on: ubuntu-latest
@@ -32,14 +32,13 @@ jobs:
         run: mvn -B -DskipTests clean package
 
   # =========================================
-  # 2) TEST – dùng Postgres service + chạy test, bỏ qua E2E
+  # 2) TEST – dùng Postgres service + chạy test (skip E2E)
   # =========================================
   test:
     name: Test (skip E2E, generate HTML report)
     runs-on: ubuntu-latest
     needs: build
 
-    # ENV dùng cho job test
     env:
       SPRING_PROFILES_ACTIVE: docker
 
@@ -60,7 +59,7 @@ jobs:
           POSTGRES_USER: ${{ secrets.DB_USER }}
           POSTGRES_PASSWORD: ${{ secrets.DB_PASSWORD }}
         ports:
-          - 5432:5432
+          - "5432:5432"
         options: >-
           --health-cmd="pg_isready -U ${{ secrets.DB_USER }}"
           --health-interval=10s
@@ -129,8 +128,7 @@ jobs:
     if: github.ref == 'refs/heads/datnt'
     runs-on: self-hosted
 
-    # 💡 Ở đây MỚI bơm PG_PORT_HOST (và các env khác) vào,
-    # để docker-compose dùng được giá trị 55432 từ repo variables.
+    # LẤY env từ GitHub Actions (vars + secrets)
     env:
       SPRING_PROFILES_ACTIVE: docker
       AUTH_DB: ${{ vars.AUTH_DB }}
@@ -144,6 +142,12 @@ jobs:
     steps:
       - name: Checkout source
         uses: actions/checkout@v4
+
+      - name: Debug env
+        run: |
+          echo "PG_PORT_HOST=${PG_PORT_HOST}"
+          echo "AUTH_DB=${AUTH_DB}"
+          echo "USER_DB=${USER_DB}"
 
       - name: Start stack with Docker Compose
         run: |
