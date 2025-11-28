@@ -19,7 +19,7 @@ public class RoleController {
     @GetMapping("/admin")
     @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<String> adminAccess() {
-        return ResponseEntity.ok("Hello ADMIN");
+        return ResponseEntity.ok("Welcome ADMIN");
     }
 
     @GetMapping("/mod")
