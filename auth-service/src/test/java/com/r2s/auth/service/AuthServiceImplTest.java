@@ -5,6 +5,7 @@ import com.r2s.auth.dto.LoginRequest;
 import com.r2s.auth.dto.RegisterRequest;
 import com.r2s.core.entity.Role;
 import com.r2s.core.entity.User;
+import com.r2s.core.exception.ConflictException;
 import com.r2s.core.repository.UserRepository;
 import com.r2s.core.security.JwtService;
 import org.junit.jupiter.api.Test;
@@ -61,7 +62,8 @@ class AuthServiceImplTest {
         RegisterRequest req = new RegisterRequest();
         req.setUsername("john");
         when(userRepository.existsByUsername("john")).thenReturn(true);
-        assertThrows(IllegalArgumentException.class, () -> service.register(req));
+        assertThrows(ConflictException.class, () -> service.register(req));
+
     }
 
     @Test

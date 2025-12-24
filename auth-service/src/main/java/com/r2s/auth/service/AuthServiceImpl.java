@@ -5,6 +5,7 @@ import com.r2s.auth.dto.LoginRequest;
 import com.r2s.auth.dto.RegisterRequest;
 import com.r2s.core.entity.Role;
 import com.r2s.core.entity.User;
+import com.r2s.core.exception.ConflictException;
 import com.r2s.core.repository.UserRepository;
 import com.r2s.core.security.JwtService;
 import lombok.RequiredArgsConstructor;
@@ -32,19 +33,27 @@ public class AuthServiceImpl implements AuthService {
     @Override
     @Transactional
     public void register(RegisterRequest request) {
-        if (userRepository.existsByUsername(request.getUsername())) {
-            throw new IllegalArgumentException("Username already exists");
+        String username = request.getUsername();
+
+        if (userRepository.existsByUsername(username)) {
+            // log duplicate (warn)
+            log.warn("Register failed - username already exists: {}", username);
+            throw new ConflictException("Username already exists");
         }
 
+        // giữ logic của bạn: role optional, không có -> USER
         Role role = request.getRole() != null ? request.getRole() : Role.ROLE_USER;
 
         User user = User.builder()
-                .username(request.getUsername())
+                .username(username)
                 .password(passwordEncoder.encode(request.getPassword()))
                 .role(role)
                 .build();
 
         userRepository.save(user);
+
+        //log register success (info) - không log password/token
+        log.info("User registered successfully: {} with role {}", username, role.name());
     }
 
     @Override
@@ -70,16 +79,13 @@ public class AuthServiceImpl implements AuthService {
                     Map.of("role", roleClaim)
             );
 
-            // Chỉ log thông tin cần thiết, KHÔNG log token
             log.info("User {} logged in successfully with role {}", user.getUsername(), roleClaim);
 
             return new AuthResponse(token);
 
         } catch (BadCredentialsException ex) {
-            // chỉ log nhẹ, không lộ password
             log.warn("Failed login attempt for username {}", request.getUsername());
-            throw ex; // trả 401
+            throw ex;
         }
-        // các exception khác (DB, JWT, …) sẽ nổ 500 → đúng ý review: dễ giám sát và debug
     }
 }
