@@ -5,7 +5,7 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Component;
 
-@Component
+@Component("r2sResponseBuilder")
 public class ResponseBuilder {
 
     public <T> ResponseEntity<ApiResponse<T>> ok(T data, String message) {

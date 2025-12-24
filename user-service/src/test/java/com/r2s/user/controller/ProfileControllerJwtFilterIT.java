@@ -110,9 +110,10 @@ class ProfileControllerJwtFilterIT {
         mockMvc.perform(get(BASE + "/me").header("Authorization", authHeader))
                 .andExpect(status().isOk())
                 .andExpect(content().contentType(MediaType.APPLICATION_JSON))
-                .andExpect(jsonPath("$.username").value("alice"))
-                .andExpect(jsonPath("$.fullName").value("Alice A"))
-                .andExpect(jsonPath("$.email").value("alice@mail.com"));
+                .andExpect(jsonPath("$.data.username").value("alice"))
+                .andExpect(jsonPath("$.data.fullName").value("Alice A"))
+                .andExpect(jsonPath("$.data.email").value("alice@mail.com"));
+
 
         // kiểm tra DB vẫn còn đúng bản ghi
         Profile inDb = profileRepository.findByUsername("alice").orElseThrow();
@@ -133,9 +134,10 @@ class ProfileControllerJwtFilterIT {
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(body)))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.username").value("alice"))
-                .andExpect(jsonPath("$.fullName").value("New Name"))
-                .andExpect(jsonPath("$.email").value("new@mail.com"));
+                .andExpect(jsonPath("$.data.username").value("alice"))
+                .andExpect(jsonPath("$.data.fullName").value("New Name"))
+                .andExpect(jsonPath("$.data.email").value("new@mail.com"));
+
 
         // kiểm tra trong DB
         Profile inDb = profileRepository.findByUsername("alice").orElseThrow();
@@ -159,9 +161,10 @@ class ProfileControllerJwtFilterIT {
 
         mockMvc.perform(get(BASE).header("Authorization", authHeader))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$", hasSize(2)))
-                .andExpect(jsonPath("$[0].username").value("alice"))
-                .andExpect(jsonPath("$[1].username").value("bob"));
+                .andExpect(jsonPath("$.data", hasSize(2)))
+                .andExpect(jsonPath("$.data[0].username").value("alice"))
+                .andExpect(jsonPath("$.data[1].username").value("bob"));
+
     }
 
     @Test

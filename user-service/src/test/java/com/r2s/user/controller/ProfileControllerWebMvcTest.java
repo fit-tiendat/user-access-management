@@ -1,13 +1,14 @@
 package com.r2s.user.controller;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.r2s.core.exception.GlobalExceptionHandler;
 import com.r2s.core.exception.NotFoundException;
 import com.r2s.core.security.JwtFilter;
 import com.r2s.user.dto.ProfileDto;
-import com.r2s.user.dto.ProfileResponse;
 import com.r2s.user.entity.Profile;
-import com.r2s.user.exception.ApiExceptionHandler;
-import com.r2s.user.service.ProfileService;
+import com.r2s.user.service.ProfileCommandService;
+import com.r2s.user.service.ProfileQueryService;
+import com.r2s.core.utils.ResponseBuilder;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -17,6 +18,7 @@ import org.springframework.boot.test.mock.mockito.MockBean;
 import org.springframework.context.annotation.Import;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.web.servlet.MockMvc;
+
 
 import java.security.Principal;
 import java.util.List;
@@ -31,23 +33,24 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
 
 @WebMvcTest(controllers = ProfileController.class)
-@AutoConfigureMockMvc(addFilters = false)   // tắt filter chain (JWT, v.v.)
-@Import(ApiExceptionHandler.class)         // dùng ApiExceptionHandler hiện tại
+@AutoConfigureMockMvc(addFilters = false)
+@Import({GlobalExceptionHandler.class,ResponseBuilder.class})
 @ActiveProfiles("test")
 class ProfileControllerWebMvcTest {
+
 
     @Autowired MockMvc mockMvc;
     @Autowired ObjectMapper om;
 
-    @MockBean ProfileService profileService;
-    @MockBean JwtFilter jwtFilter;   // để context security không bị thiếu bean
+    @MockBean ProfileCommandService commandService;
+    @MockBean ProfileQueryService queryService;
 
-    // helper fake principal
+    // addFilters=false nên JwtFilter không chạy, nhưng giữ mock để context khỏi thiếu bean nếu cần
+    @MockBean JwtFilter jwtFilter;
+
     private Principal principal(String username) {
         return () -> username;
     }
-
-    // ====== ADMIN endpoint /api/v1/users ======
 
     @Test
     void list_shouldReturn200_andArray() throws Exception {
@@ -55,24 +58,26 @@ class ProfileControllerWebMvcTest {
                 Profile.builder().id(1L).username("alice").fullName("Alice").email("a@mail.com").build(),
                 Profile.builder().id(2L).username("bob").fullName("Bob").email("b@mail.com").build()
         );
-        given(profileService.getAll()).willReturn(list);
+        given(queryService.getAll()).willReturn(list);
 
         mockMvc.perform(get("/api/v1/users").accept(APPLICATION_JSON))
                 .andExpect(status().isOk())
-                .andExpect(content().contentType(APPLICATION_JSON))
-                .andExpect(jsonPath("$", hasSize(2)))
-                .andExpect(jsonPath("[0].username").value("alice"))
-                .andExpect(jsonPath("[1].username").value("bob"));
+                .andExpect(content().contentTypeCompatibleWith(APPLICATION_JSON))
+                .andExpect(jsonPath("$.status").value("SUCCESS"))
+                .andExpect(jsonPath("$.data", hasSize(2)))
+                .andExpect(jsonPath("$.data[0].username").value("alice"))
+                .andExpect(jsonPath("$.data[1].username").value("bob"));
     }
 
     @Test
     void list_shouldReturn200_andEmptyArray() throws Exception {
-        given(profileService.getAll()).willReturn(List.of());
+        given(queryService.getAll()).willReturn(List.of());
 
         mockMvc.perform(get("/api/v1/users").accept(APPLICATION_JSON))
                 .andExpect(status().isOk())
-                .andExpect(content().contentType(APPLICATION_JSON))
-                .andExpect(jsonPath("$", hasSize(0)));
+                .andExpect(content().contentTypeCompatibleWith(APPLICATION_JSON))
+                .andExpect(jsonPath("$.status").value("SUCCESS"))
+                .andExpect(jsonPath("$.data", hasSize(0)));
     }
 
     @Test
@@ -80,19 +85,20 @@ class ProfileControllerWebMvcTest {
         mockMvc.perform(delete("/api/v1/users/alice"))
                 .andExpect(status().isNoContent());
 
-        verify(profileService).deleteByUsername("alice");
+        verify(commandService).deleteByUsername("alice");
     }
 
     @Test
     void delete_should404_whenServiceThrowsNotFound() throws Exception {
         doThrow(new NotFoundException("profile not found"))
-                .when(profileService).deleteByUsername("ghost");
+                .when(commandService).deleteByUsername("ghost");
 
         mockMvc.perform(delete("/api/v1/users/ghost"))
-                .andExpect(status().isNotFound());
+                .andExpect(status().isNotFound())
+                .andExpect(content().contentTypeCompatibleWith(APPLICATION_JSON))
+                .andExpect(jsonPath("$.status").value("FAILED"))
+                .andExpect(jsonPath("$.message").value("profile not found"));
     }
-
-    // ====== /api/v1/users/me ======
 
     @Test
     void getMe_shouldReturnProfile_ofCurrentUser() throws Exception {
@@ -102,17 +108,18 @@ class ProfileControllerWebMvcTest {
                 .fullName("Alice")
                 .email("alice@mail.com")
                 .build();
-        given(profileService.getByUsername("alice")).willReturn(p);
+        given(queryService.getByUsername("alice")).willReturn(p);
 
         mockMvc.perform(get("/api/v1/users/me")
                         .principal(principal("alice"))
                         .accept(APPLICATION_JSON))
                 .andExpect(status().isOk())
-                .andExpect(content().contentType(APPLICATION_JSON))
-                .andExpect(jsonPath("$.username").value("alice"))
-                .andExpect(jsonPath("$.email").value("alice@mail.com"));
+                .andExpect(content().contentTypeCompatibleWith(APPLICATION_JSON))
+                .andExpect(jsonPath("$.status").value("SUCCESS"))
+                .andExpect(jsonPath("$.data.username").value("alice"))
+                .andExpect(jsonPath("$.data.email").value("alice@mail.com"));
 
-        verify(profileService).getByUsername("alice");
+        verify(queryService).getByUsername("alice");
     }
 
     @Test
@@ -130,12 +137,12 @@ class ProfileControllerWebMvcTest {
                         .contentType(APPLICATION_JSON)
                         .content(json))
                 .andExpect(status().isBadRequest())
-                // body hiện tại là text/plain: "email: must be a well-formed email address"
-                .andExpect(content().string(containsString("email")))
-                .andExpect(content().string(containsString("must be a well-formed email address")));
+                .andExpect(content().contentTypeCompatibleWith(APPLICATION_JSON))
+                .andExpect(jsonPath("$.status").value("FAILED"))
+                .andExpect(jsonPath("$.message", containsString("email")))
+                .andExpect(jsonPath("$.message", containsString("must be a well-formed email address")));
 
-        // validation fail nên service không được gọi
-        verifyNoInteractions(profileService);
+        verifyNoInteractions(commandService, queryService);
     }
 
     @Test
@@ -155,20 +162,20 @@ class ProfileControllerWebMvcTest {
                 .email("alice@mail.com")
                 .build();
 
-        given(profileService.upsert(any(ProfileDto.class))).willReturn(saved);
+        given(commandService.upsert(any(ProfileDto.class))).willReturn(saved);
 
         mockMvc.perform(put("/api/v1/users/me")
-                        .principal(principal("alice"))   // user thực tế là alice
+                        .principal(principal("alice"))
                         .contentType(APPLICATION_JSON)
                         .content(json))
-                .andExpect(status().isOk());
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.status").value("SUCCESS"))
+                .andExpect(jsonPath("$.data.username").value("alice"));
 
-        // bắt argument truyền xuống service
         ArgumentCaptor<ProfileDto> captor = ArgumentCaptor.forClass(ProfileDto.class);
-        verify(profileService).upsert(captor.capture());
+        verify(commandService).upsert(captor.capture());
         ProfileDto dtoUsed = captor.getValue();
 
-        // username phải bị ép lại thành "alice", không phải "hacker"
         assertThat(dtoUsed.username()).isEqualTo("alice");
     }
 }
