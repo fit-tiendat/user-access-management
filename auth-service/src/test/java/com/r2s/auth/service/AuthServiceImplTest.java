@@ -1,14 +1,17 @@
 package com.r2s.auth.service;
 
-import com.r2s.auth.security.JwtClaimsBuilder;
-import com.r2s.core.dto.AuthResponse;
 import com.r2s.auth.dto.LoginRequest;
 import com.r2s.auth.dto.RegisterRequest;
+import com.r2s.auth.security.JwtClaimsBuilder;
+import com.r2s.auth.strategy.AuthenticationStrategy;
+import com.r2s.auth.strategy.PasswordAuthenticationStrategy;
+import com.r2s.core.dto.AuthResponse;
 import com.r2s.core.entity.Role;
 import com.r2s.core.entity.User;
 import com.r2s.core.exception.ConflictException;
 import com.r2s.core.repository.UserRepository;
 import com.r2s.core.security.JwtService;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.*;
@@ -19,6 +22,7 @@ import org.springframework.security.authentication.UsernamePasswordAuthenticatio
 import org.springframework.security.core.Authentication;
 import org.springframework.security.crypto.password.PasswordEncoder;
 
+import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 
@@ -30,15 +34,44 @@ import static org.mockito.Mockito.*;
 @ExtendWith(MockitoExtension.class)
 class AuthServiceImplTest {
 
+    // ===== Common mocks (repo / encoder...) =====
     @Mock UserRepository userRepository;
     @Mock PasswordEncoder passwordEncoder;
+
+    // ===== Auth mocks =====
     @Mock AuthenticationManager authManager;
     @Mock JwtService jwtService;
-    @Mock
-    JwtClaimsBuilder claimsBuilder;
+    @Mock JwtClaimsBuilder claimsBuilder;
 
-    @InjectMocks AuthenticationServiceImpl auth;
-    @InjectMocks RegistrationServiceImpl register;
+    // ===== Services under test =====
+    RegistrationServiceImpl registrationService;
+
+    // Router service (AuthenticationServiceImpl) depends on List<AuthenticationStrategy>
+    AuthenticationServiceImpl authenticationService;
+
+    // Strategy under test
+    PasswordAuthenticationStrategy passwordStrategy;
+
+    // Strategy mock to test router behavior
+    @Mock AuthenticationStrategy strategyMock;
+
+    @BeforeEach
+    void setUp() {
+        // Registration service
+        registrationService = new RegistrationServiceImpl(userRepository, passwordEncoder);
+
+        // Real password strategy (logic login)
+        passwordStrategy = new PasswordAuthenticationStrategy(
+                authManager, userRepository, jwtService, claimsBuilder
+        );
+
+        // Authentication router: by default we inject 1 strategy mock
+        authenticationService = new AuthenticationServiceImpl(List.of(strategyMock));
+    }
+
+    // =========================================================
+    // =============== RegistrationServiceImpl tests ============
+    // =========================================================
 
     @Test
     void register_shouldSaveUserWithDefaultRole() {
@@ -51,11 +84,12 @@ class AuthServiceImplTest {
         when(passwordEncoder.encode("1234")).thenReturn("ENC");
         when(userRepository.save(any(User.class))).thenAnswer(i -> i.getArgument(0));
 
-        register.register(req);
+        registrationService.register(req);
 
         ArgumentCaptor<User> cap = ArgumentCaptor.forClass(User.class);
         verify(userRepository).save(cap.capture());
         User u = cap.getValue();
+
         assertThat(u.getUsername()).isEqualTo("john");
         assertThat(u.getPassword()).isEqualTo("ENC");
         assertThat(u.getRole()).isEqualTo(Role.ROLE_USER);
@@ -65,19 +99,53 @@ class AuthServiceImplTest {
     void register_shouldThrowIfDuplicate() {
         RegisterRequest req = new RegisterRequest();
         req.setUsername("john");
-        when(userRepository.existsByUsername("john")).thenReturn(true);
-        assertThrows(ConflictException.class, () -> register.register(req));
 
+        when(userRepository.existsByUsername("john")).thenReturn(true);
+
+        assertThrows(ConflictException.class, () -> registrationService.register(req));
+        verify(userRepository, never()).save(any());
+    }
+
+    // =========================================================
+    // =============== AuthenticationServiceImpl (router) ========
+    // =========================================================
+
+    @Test
+    void authRouter_shouldPickPasswordStrategy_andReturnToken() {
+        LoginRequest req = new LoginRequest("john", "1234");
+
+        // router uses authType = "password"
+        when(strategyMock.supports("password")).thenReturn(true);
+        when(strategyMock.authenticate(any(LoginRequest.class)))
+                .thenReturn(new AuthResponse("JWT-TOKEN"));
+
+        AuthResponse res = authenticationService.login(req);
+
+        assertThat(res.getToken()).isEqualTo("JWT-TOKEN");
+        verify(strategyMock).supports("password");
+        verify(strategyMock).authenticate(req);
     }
 
     @Test
-    void login_shouldReturnTokenWithRoleClaim() {
-        LoginRequest req = new LoginRequest();
-        req.setUsername("john");
-        req.setPassword("1234");
+    void authRouter_shouldThrow_whenNoStrategyFound() {
+        LoginRequest req = new LoginRequest("john", "1234");
 
-        Authentication okAuth =
-                new UsernamePasswordAuthenticationToken("john", null);
+        when(strategyMock.supports("password")).thenReturn(false);
+
+        assertThrows(IllegalStateException.class, () -> authenticationService.login(req));
+        verify(strategyMock).supports("password");
+        verify(strategyMock, never()).authenticate(any());
+    }
+
+    // =========================================================
+    // =============== PasswordAuthenticationStrategy tests ======
+    // =========================================================
+
+    @Test
+    void passwordStrategy_login_shouldReturnTokenWithRoleClaim() {
+        LoginRequest req = new LoginRequest("john", "1234");
+
+        Authentication okAuth = new UsernamePasswordAuthenticationToken("john", null);
 
         User user = User.builder()
                 .username("john")
@@ -85,53 +153,41 @@ class AuthServiceImplTest {
                 .build();
 
         when(authManager.authenticate(any())).thenReturn(okAuth);
-        when(userRepository.findByUsername("john"))
-                .thenReturn(Optional.of(user));
+        when(userRepository.findByUsername("john")).thenReturn(Optional.of(user));
 
-        // FIX 2: mock claimsBuilder
-        when(claimsBuilder.buildClaims(user))
-                .thenReturn(Map.of("role", "ROLE_ADMIN"));
+        when(claimsBuilder.buildClaims(user)).thenReturn(Map.of("role", "ROLE_ADMIN"));
+        when(jwtService.generateToken(eq("john"), anyMap())).thenReturn("JWT-TOKEN");
 
-        when(jwtService.generateToken(eq("john"), any(Map.class)))
-                .thenReturn("JWT-TOKEN");
+        AuthResponse res = passwordStrategy.authenticate(req);
 
-        AuthResponse res = auth.login(req);
         assertThat(res.getToken()).isEqualTo("JWT-TOKEN");
-        verify(jwtService).generateToken(eq("john"),
-                argThat(m -> "ROLE_ADMIN".equals(m.get("role"))));
+        verify(jwtService).generateToken(eq("john"), argThat(m -> "ROLE_ADMIN".equals(m.get("role"))));
     }
 
     @Test
-    void login_shouldThrowOnBadCredentials() {
-        LoginRequest req = new LoginRequest();
-        req.setUsername("john");
-        req.setPassword("bad");
+    void passwordStrategy_login_shouldThrowOnBadCredentials() {
+        LoginRequest req = new LoginRequest("john", "bad");
 
         when(authManager.authenticate(any()))
                 .thenThrow(new BadCredentialsException("bad"));
 
-        assertThrows(BadCredentialsException.class, () -> auth.login(req));
+        assertThrows(BadCredentialsException.class, () -> passwordStrategy.authenticate(req));
+
+        verify(userRepository, never()).findByUsername(anyString());
+        verify(jwtService, never()).generateToken(anyString(), anyMap());
     }
 
     @Test
-    void login_shouldThrowBadCredentials_whenUserNotFoundAfterSuccessfulAuth() {
-        LoginRequest req = new LoginRequest();
-        req.setUsername("ghost");
-        req.setPassword("any");
+    void passwordStrategy_login_shouldThrowBadCredentials_whenUserNotFoundAfterSuccessfulAuth() {
+        LoginRequest req = new LoginRequest("ghost", "any");
 
-        // 1) authManager.authenticate thành công
         Authentication okAuth = new UsernamePasswordAuthenticationToken("ghost", null);
         when(authManager.authenticate(any())).thenReturn(okAuth);
 
-        // 2) nhưng repository không tìm thấy user
         when(userRepository.findByUsername("ghost")).thenReturn(Optional.empty());
 
-        // 3) service phải ném BadCredentialsException (401) như mong đợi
-        assertThrows(BadCredentialsException.class, () -> auth.login(req));
+        assertThrows(BadCredentialsException.class, () -> passwordStrategy.authenticate(req));
 
-        // không được generate JWT với user không tồn tại
-        verify(jwtService, never()).generateToken(anyString(), any(Map.class));
+        verify(jwtService, never()).generateToken(anyString(), anyMap());
     }
-
-
 }
