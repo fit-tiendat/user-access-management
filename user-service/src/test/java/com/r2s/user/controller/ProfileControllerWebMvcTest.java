@@ -19,7 +19,6 @@ import org.springframework.context.annotation.Import;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.web.servlet.MockMvc;
 
-
 import java.security.Principal;
 import java.util.List;
 
@@ -34,10 +33,9 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 @WebMvcTest(controllers = ProfileController.class)
 @AutoConfigureMockMvc(addFilters = false)
-@Import({GlobalExceptionHandler.class,ResponseBuilder.class})
+@Import({GlobalExceptionHandler.class, ResponseBuilder.class})
 @ActiveProfiles("test")
 class ProfileControllerWebMvcTest {
-
 
     @Autowired MockMvc mockMvc;
     @Autowired ObjectMapper om;
@@ -45,7 +43,6 @@ class ProfileControllerWebMvcTest {
     @MockBean ProfileCommandService commandService;
     @MockBean ProfileQueryService queryService;
 
-    // addFilters=false nên JwtFilter không chạy, nhưng giữ mock để context khỏi thiếu bean nếu cần
     @MockBean JwtFilter jwtFilter;
 
     private Principal principal(String username) {
@@ -124,9 +121,9 @@ class ProfileControllerWebMvcTest {
 
     @Test
     void updateMe_should400_whenInvalidEmail() throws Exception {
+        // body không còn username
         String json = """
                 {
-                  "username": "alice",
                   "fullName": "Alice",
                   "email": "not-an-email"
                 }
@@ -146,7 +143,8 @@ class ProfileControllerWebMvcTest {
     }
 
     @Test
-    void updateMe_shouldForceUsernameFromToken_evenIfBodyCheated() throws Exception {
+    void updateMe_shouldUseUsernameFromPrincipal_andIgnoreBodyUsernameFieldIfSent() throws Exception {
+        // Nếu client cố tình gửi username (dù DTO không có), Jackson sẽ ignore field lạ
         String json = """
                 {
                   "username": "hacker",
@@ -162,7 +160,7 @@ class ProfileControllerWebMvcTest {
                 .email("alice@mail.com")
                 .build();
 
-        given(commandService.upsert(any(ProfileDto.class))).willReturn(saved);
+        given(commandService.upsert(eq("alice"), any(ProfileDto.class))).willReturn(saved);
 
         mockMvc.perform(put("/api/v1/users/me")
                         .principal(principal("alice"))
@@ -172,10 +170,11 @@ class ProfileControllerWebMvcTest {
                 .andExpect(jsonPath("$.status").value("SUCCESS"))
                 .andExpect(jsonPath("$.data.username").value("alice"));
 
-        ArgumentCaptor<ProfileDto> captor = ArgumentCaptor.forClass(ProfileDto.class);
-        verify(commandService).upsert(captor.capture());
-        ProfileDto dtoUsed = captor.getValue();
+        ArgumentCaptor<ProfileDto> dtoCaptor = ArgumentCaptor.forClass(ProfileDto.class);
+        verify(commandService).upsert(eq("alice"), dtoCaptor.capture());
 
-        assertThat(dtoUsed.username()).isEqualTo("alice");
+        ProfileDto dtoUsed = dtoCaptor.getValue();
+        assertThat(dtoUsed.fullName()).isEqualTo("Alice");
+        assertThat(dtoUsed.email()).isEqualTo("alice@mail.com");
     }
 }

@@ -18,9 +18,9 @@ public class ProfileServiceImpl implements ProfileService {
 
     @Override
     @Transactional
-    public Profile upsert(ProfileDto dto) {
-        Profile p = repo.findByUsername(dto.username())
-                .orElseGet(() -> Profile.builder().username(dto.username()).build());
+    public Profile upsert(String username, ProfileDto dto) {
+        Profile p = repo.findByUsername(username)
+                .orElseGet(() -> Profile.builder().username(username).build());
 
         p.setFullName(dto.fullName());
         p.setEmail(dto.email());

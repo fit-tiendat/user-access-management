@@ -60,9 +60,7 @@ public class ProfileController {
     ) {
         String username = requireUsername(principal);
 
-        Profile saved = commandService.upsert(
-                new ProfileDto(username, dto.fullName(), dto.email())
-        );
+        Profile saved = commandService.upsert(username, dto);
         return responseBuilder.ok(toResponse(saved), "Profile updated successfully");
     }
 
