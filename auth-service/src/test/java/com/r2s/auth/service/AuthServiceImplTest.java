@@ -1,6 +1,7 @@
 package com.r2s.auth.service;
 
-import com.r2s.auth.dto.AuthResponse;
+import com.r2s.auth.security.JwtClaimsBuilder;
+import com.r2s.core.dto.AuthResponse;
 import com.r2s.auth.dto.LoginRequest;
 import com.r2s.auth.dto.RegisterRequest;
 import com.r2s.core.entity.Role;
@@ -33,8 +34,11 @@ class AuthServiceImplTest {
     @Mock PasswordEncoder passwordEncoder;
     @Mock AuthenticationManager authManager;
     @Mock JwtService jwtService;
+    @Mock
+    JwtClaimsBuilder claimsBuilder;
 
-    @InjectMocks AuthServiceImpl service;
+    @InjectMocks AuthenticationServiceImpl auth;
+    @InjectMocks RegistrationServiceImpl register;
 
     @Test
     void register_shouldSaveUserWithDefaultRole() {
@@ -47,7 +51,7 @@ class AuthServiceImplTest {
         when(passwordEncoder.encode("1234")).thenReturn("ENC");
         when(userRepository.save(any(User.class))).thenAnswer(i -> i.getArgument(0));
 
-        service.register(req);
+        register.register(req);
 
         ArgumentCaptor<User> cap = ArgumentCaptor.forClass(User.class);
         verify(userRepository).save(cap.capture());
@@ -62,7 +66,7 @@ class AuthServiceImplTest {
         RegisterRequest req = new RegisterRequest();
         req.setUsername("john");
         when(userRepository.existsByUsername("john")).thenReturn(true);
-        assertThrows(ConflictException.class, () -> service.register(req));
+        assertThrows(ConflictException.class, () -> register.register(req));
 
     }
 
@@ -72,18 +76,26 @@ class AuthServiceImplTest {
         req.setUsername("john");
         req.setPassword("1234");
 
-        Authentication okAuth = new UsernamePasswordAuthenticationToken("john", null);
+        Authentication okAuth =
+                new UsernamePasswordAuthenticationToken("john", null);
+
+        User user = User.builder()
+                .username("john")
+                .role(Role.ROLE_ADMIN)
+                .build();
+
         when(authManager.authenticate(any())).thenReturn(okAuth);
         when(userRepository.findByUsername("john"))
-                .thenReturn(Optional.of(User.builder()
-                        .username("john")
-                        .role(Role.ROLE_ADMIN)
-                        .build()));
+                .thenReturn(Optional.of(user));
+
+        // FIX 2: mock claimsBuilder
+        when(claimsBuilder.buildClaims(user))
+                .thenReturn(Map.of("role", "ROLE_ADMIN"));
+
         when(jwtService.generateToken(eq("john"), any(Map.class)))
                 .thenReturn("JWT-TOKEN");
 
-        AuthResponse res = service.login(req);
-
+        AuthResponse res = auth.login(req);
         assertThat(res.getToken()).isEqualTo("JWT-TOKEN");
         verify(jwtService).generateToken(eq("john"),
                 argThat(m -> "ROLE_ADMIN".equals(m.get("role"))));
@@ -98,7 +110,7 @@ class AuthServiceImplTest {
         when(authManager.authenticate(any()))
                 .thenThrow(new BadCredentialsException("bad"));
 
-        assertThrows(BadCredentialsException.class, () -> service.login(req));
+        assertThrows(BadCredentialsException.class, () -> auth.login(req));
     }
 
     @Test
@@ -115,7 +127,7 @@ class AuthServiceImplTest {
         when(userRepository.findByUsername("ghost")).thenReturn(Optional.empty());
 
         // 3) service phải ném BadCredentialsException (401) như mong đợi
-        assertThrows(BadCredentialsException.class, () -> service.login(req));
+        assertThrows(BadCredentialsException.class, () -> auth.login(req));
 
         // không được generate JWT với user không tồn tại
         verify(jwtService, never()).generateToken(anyString(), any(Map.class));

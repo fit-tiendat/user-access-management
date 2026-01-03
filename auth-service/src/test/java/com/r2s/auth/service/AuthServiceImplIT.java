@@ -1,6 +1,6 @@
 package com.r2s.auth.service;
 
-import com.r2s.auth.dto.AuthResponse;
+import com.r2s.core.dto.AuthResponse;
 import com.r2s.auth.dto.LoginRequest;
 import com.r2s.auth.dto.RegisterRequest;
 import org.junit.jupiter.api.DisplayName;
@@ -40,7 +40,9 @@ class AuthServiceImplIT {
     }
 
     @Autowired
-    AuthService authService;
+    AuthenticationService authService;
+    @Autowired
+    RegistrationService registrationService;
 
     @Test
     @DisplayName("register: đăng ký user mới -> login lại được, trả JWT")
@@ -53,7 +55,7 @@ class AuthServiceImplIT {
         );
 
         // when: chỉ cần gọi register, không cần giá trị trả về
-        authService.register(registerReq);
+        registrationService.register(registerReq);
 
         // then: login lại phải thành công và trả token
         LoginRequest loginReq = new LoginRequest(
@@ -76,7 +78,7 @@ class AuthServiceImplIT {
                 "@P4ssw0rd",
                 null
         );
-        authService.register(registerReq);
+        registrationService.register(registerReq);
 
         // when + then: login sai password -> ném BadCredentialsException
         LoginRequest loginReq = new LoginRequest(

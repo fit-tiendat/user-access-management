@@ -1,10 +1,12 @@
 package com.r2s.auth.controller;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.r2s.auth.dto.AuthResponse;
+import com.r2s.core.dto.AuthResponse;
 import com.r2s.auth.exception.ApiExceptionHandler;
-import com.r2s.auth.service.AuthService;
+import com.r2s.auth.service.AuthenticationService;
+import com.r2s.auth.service.RegistrationService;
 import org.junit.jupiter.api.Test;
+import org.mockito.Mock;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
 import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
@@ -26,17 +28,23 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 @ActiveProfiles("test")
 class AuthControllerWebMvcTest {
 
-    @Autowired MockMvc mockMvc;
-    @Autowired ObjectMapper om;
-    @MockBean com.r2s.core.security.JwtFilter jwtFilter;
-    @MockBean AuthService authService;
+    @Autowired
+    MockMvc mockMvc;
+    @Autowired
+    ObjectMapper om;
+    @MockBean
+    com.r2s.core.security.JwtFilter jwtFilter;
+    @MockBean
+    AuthenticationService authService;
+    @MockBean
+    RegistrationService register;
 
     @Test
     void register_shouldReturn200_andSuccessMessage() throws Exception {
         // build JSON trực tiếp để khỏi cần constructor DTO
         String body = """
-          {"username":"john","password":"secret123"}
-        """;
+                  {"username":"john","password":"secret123"}
+                """;
 
         mockMvc.perform(post("/api/v1/auth/register")
                         .contentType(APPLICATION_JSON)
@@ -52,8 +60,8 @@ class AuthControllerWebMvcTest {
                 .thenReturn(new AuthResponse("jwt-token")); // <-- sửa ở đây
 
         String body = """
-      {"username":"john","password":"secret123"}
-    """;
+                  {"username":"john","password":"secret123"}
+                """;
 
         mockMvc.perform(post("/api/v1/auth/login")
                         .contentType(APPLICATION_JSON)
@@ -66,8 +74,8 @@ class AuthControllerWebMvcTest {
     @Test
     void register_should400_whenUsernameHasWhitespace() throws Exception {
         String body = """
-          {"username":"john doe","password":"secret123"}
-        """;
+                  {"username":"john doe","password":"secret123"}
+                """;
 
         mockMvc.perform(post("/api/v1/auth/register")
                         .contentType(APPLICATION_JSON)
@@ -81,19 +89,20 @@ class AuthControllerWebMvcTest {
                 .thenThrow(new BadCredentialsException("bad creds"));
 
         String body = """
-      {"username":"john","password":"bad"}
-      """;
+                {"username":"john","password":"bad"}
+                """;
 
         mockMvc.perform(post("/api/v1/auth/login")
                         .contentType(APPLICATION_JSON)
                         .content(body))
                 .andExpect(status().isUnauthorized());
     }
+
     @Test
     void register_should400_whenUsernameHasWhitespace_andReturnErrorMap() throws Exception {
         String body = """
-    {"username":"john doe","password":"secret123"}
-  """;
+                  {"username":"john doe","password":"secret123"}
+                """;
 
         mockMvc.perform(post("/api/v1/auth/register")
                         .contentType(APPLICATION_JSON)
@@ -101,14 +110,15 @@ class AuthControllerWebMvcTest {
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.username").exists());   // trả map field -> message
     }
+
     @Test
     void login_should401_andMessage_onBadCredentials() throws Exception {
         // ném BadCredentialsException từ service
         when(authService.login(any())).thenThrow(new org.springframework.security.authentication.BadCredentialsException("bad"));
 
         String body = """
-    {"username":"john","password":"bad"}
-  """;
+                  {"username":"john","password":"bad"}
+                """;
 
         mockMvc.perform(post("/api/v1/auth/login")
                         .contentType(APPLICATION_JSON)

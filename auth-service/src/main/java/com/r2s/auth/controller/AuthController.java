@@ -1,15 +1,14 @@
 package com.r2s.auth.controller;
 
-import com.r2s.auth.dto.AuthResponse;
+import com.r2s.core.dto.AuthResponse;
 import com.r2s.auth.dto.LoginRequest;
 import com.r2s.auth.dto.RegisterRequest;
-import com.r2s.core.entity.User;
-import com.r2s.auth.service.AuthService;
+import com.r2s.auth.service.AuthenticationService;
+import com.r2s.auth.service.RegistrationService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
-import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.*;
 
 @RestController
@@ -17,19 +16,18 @@ import org.springframework.web.bind.annotation.*;
 @RequiredArgsConstructor
 public class AuthController {
 
-    private final AuthService authService;
+    private final RegistrationService registrationService;
+    private final AuthenticationService authenticationService;
 
-    // POST /auth/register: body chỉ có username & password
     @PostMapping("/register")
     public ResponseEntity<String> register(@Valid @RequestBody RegisterRequest request) {
-        authService.register(request);
+        registrationService.register(request);
         return ResponseEntity.ok("User registered successfully");
     }
 
-    // POST /auth/login: trả JWT
     @PostMapping("/login")
     public ResponseEntity<AuthResponse> login(@Valid @RequestBody LoginRequest request) {
-        return ResponseEntity.ok(authService.login(request));
+        return ResponseEntity.ok(authenticationService.login(request));
     }
 
     @GetMapping("/admin-only")

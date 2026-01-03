@@ -1,10 +1,11 @@
 package com.r2s.auth.controller;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.r2s.auth.dto.AuthResponse;
+import com.r2s.core.dto.AuthResponse;
 import com.r2s.auth.dto.LoginRequest;
 import com.r2s.auth.dto.RegisterRequest;
-import com.r2s.auth.service.AuthService;
+import com.r2s.auth.service.AuthenticationService;
+import com.r2s.auth.service.RegistrationService;
 import com.r2s.core.entity.Role;
 import com.r2s.core.security.JwtFilter;
 import com.r2s.core.security.JwtService;
@@ -50,7 +51,12 @@ class AuthControllerJwtFilterIT {
 
     @MockBean JwtService jwtService;
     @MockBean UserDetailsService userDetailsService;
-    @MockBean AuthService authService;
+
+    @MockBean
+    RegistrationService registrationService;
+    @MockBean
+    AuthenticationService authenticationService;
+
 
     // ====== Testcontainers Postgres cho profile test ======
     @Container
@@ -91,7 +97,7 @@ class AuthControllerJwtFilterIT {
                 .andExpect(status().isOk())
                 .andExpect(content().string("User registered successfully"));
 
-        verify(authService).register(any(RegisterRequest.class));
+        verify(registrationService).register(any(RegisterRequest.class));
     }
 
     @Test
@@ -110,7 +116,7 @@ class AuthControllerJwtFilterIT {
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.username").exists());
 
-        verifyNoInteractions(authService);
+        verifyNoInteractions(registrationService);
     }
 
     @Test
@@ -121,7 +127,7 @@ class AuthControllerJwtFilterIT {
         req.setPassword("secret123");
 
         AuthResponse resp = new AuthResponse("jwt.token.here");
-        given(authService.login(any(LoginRequest.class))).willReturn(resp);
+        given(authenticationService.login(any(LoginRequest.class))).willReturn(resp);
 
         mockMvc.perform(post(BASE + "/login")
                         .contentType(APPLICATION_JSON)
@@ -130,7 +136,7 @@ class AuthControllerJwtFilterIT {
                 .andExpect(content().contentType(APPLICATION_JSON))
                 .andExpect(jsonPath("$.token").value("jwt.token.here"));
 
-        verify(authService).login(any(LoginRequest.class));
+        verify(authenticationService).login(any(LoginRequest.class));
     }
 
     @Test
@@ -140,7 +146,7 @@ class AuthControllerJwtFilterIT {
         req.setUsername("alice1");
         req.setPassword("wrong-pass");
 
-        given(authService.login(any(LoginRequest.class)))
+        given(authenticationService.login(any(LoginRequest.class)))
                 .willThrow(new BadCredentialsException("Invalid username or password"));
 
         mockMvc.perform(post(BASE + "/login")
@@ -159,7 +165,7 @@ class AuthControllerJwtFilterIT {
                 .andExpect(status().isUnauthorized());
 
         // endpoint này không dùng AuthService, đảm bảo không bị đụng
-        verifyNoInteractions(authService);
+        verifyNoInteractions(authenticationService);
     }
 
     @Test
