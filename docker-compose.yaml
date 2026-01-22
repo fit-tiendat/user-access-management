@@ -1,6 +1,6 @@
 services:
   postgres-db:
-    image: postgres:15
+    image: postgres:13 # Flyway Community 11.7.2 fully supports PG 13
     environment:
       POSTGRES_USER: ${POSTGRES_USER}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
@@ -10,10 +10,10 @@ services:
       - "${PG_PORT_HOST}:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
-      # REMOVED: init.sql mount - Flyway handles schema creation now
-      # - ./postgres/init.sql:/docker-entrypoint-initdb.d/init.sql
+      # Auto-create databases on first startup
+      - ./postgres/init-databases.sql:/docker-entrypoint-initdb.d/init-databases.sql
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d postgres"]
+      test: [ "CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d postgres" ]
       interval: 5s
       timeout: 3s
       retries: 20
