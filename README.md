@@ -1,11 +1,23 @@
 # User Access Management
 
-Mono-repo gồm 3 module:
-- `core` – entity/common utils
-- `auth-service` – đăng ký/đăng nhập/JWT
-- `user-service` – quản lý người dùng & hồ sơ
+## 📚 Giới thiệu
 
-Repo đã **dockerize** đầy đủ (Postgres + 2 service) và tài liệu hóa cách dùng **pgAdmin** để truy cập DB trong container.
+Mono-repo JWT Authentication System được xây dựng với **Spring Boot 3.5.6** và **Java 17**, áp dụng đầy đủ **SOLID principles** và **Design Patterns** (Strategy, Builder, Factory).
+
+### Modules
+- `core` – Shared entities, repositories, security components & utilities
+- `auth-service` – Authentication service (Register/Login/JWT) - Port 8081
+- `user-service` – User management & profile service - Port 8082
+
+### Tính năng nổi bật
+- ✅ **Multi-module Maven architecture** với dependency management
+- ✅ **JWT-based stateless authentication** với BCrypt password encoding
+- ✅ **Full Docker support** (Postgres + 2 microservices)
+- ✅ **GitLab CI/CD pipeline** (Build → Test → Deploy)
+- ✅ **Comprehensive testing** (Unit tests + Integration tests + E2E tests với Testcontainers)
+- ✅ **SOLID principles** implementation throughout codebase
+- ✅ **API Documentation** với Springdoc OpenAPI (Swagger UI)
+- ✅ **Database per service** pattern (auth_service & user_service DBs)
 
 ---
 
@@ -33,26 +45,90 @@ Repo đã **dockerize** đầy đủ (Postgres + 2 service) và tài liệu hóa
 
 ---
 
-## Cấu trúc
-user-access-manament/
-├─ core/
-├─ auth-service/
-│ ├─ src/main/resources/
-│ │ ├─ application.properties
-│ │ └─ application-docker.properties
-│ ├─ Dockerfile
-│ └─ .dockerignore
-├─ user-service/
-│ ├─ src/main/resources/
-│ │ ├─ application.properties
-│ │ └─ application-docker.properties
-│ ├─ Dockerfile
-│ └─ .dockerignore
-├─ postgres/
-│ └─ init.sql # tạo DB auth_service, user_service khi lần đầu dựng
-├─ docker-compose.yaml
-├─ .env # biến môi trường DB
-└─ README.md
+## 📁 Cấu trúc Project
+
+```
+user-access-management/
+├── 📦 core/                           # Shared module
+│   ├── src/main/java/com/r2s/core/
+│   │   ├── config/                   # OpenAPI, Security constants
+│   │   ├── dto/                      # ApiResponse, AuthResponse
+│   │   ├── entity/                   # User, Role (enum)
+│   │   ├── exception/                # Custom exceptions & GlobalExceptionHandler
+│   │   ├── repository/               # UserRepository
+│   │   ├── security/                 # JwtService, JwtFilter, CustomUserDetailsService
+│   │   └── utils/                    # CommonConstants, LoggerUtil, ResponseBuilder
+│   ├── src/test/java/                # Unit tests cho security components
+│   └── pom.xml
+│
+├── 🔐 auth-service/                   # Authentication Service (Port 8081)
+│   ├── src/main/java/com/r2s/auth/
+│   │   ├── config/                   # SecurityConfig, JpaConfig
+│   │   ├── controller/               # AuthController, RoleController
+│   │   ├── dto/                      # LoginRequest, RegisterRequest
+│   │   ├── exception/                # ApiExceptionHandler
+│   │   ├── security/                 # JwtClaimsBuilder (Builder pattern)
+│   │   ├── service/                  # AuthenticationService, RegistrationService
+│   │   └── strategy/                 # AuthenticationStrategy (Strategy pattern)
+│   ├── src/main/resources/
+│   │   ├── application.properties
+│   │   └── application-docker.properties
+│   ├── src/test/java/                # WebMvcTest, Integration tests, E2E tests
+│   │   ├── controller/               # AuthControllerWebMvcTest
+│   │   ├── service/                  # Service layer tests
+│   │   └── e2e/                      # AuthE2EFlowTest (Testcontainers)
+│   ├── Dockerfile
+│   └── pom.xml
+│
+├── 👤 user-service/                   # User Management Service (Port 8082)
+│   ├── src/main/java/com/r2s/user/
+│   │   ├── config/                   # SecurityConfig
+│   │   ├── controller/               # UserController
+│   │   ├── dto/                      # DTOs for user operations
+│   │   ├── entity/                   # UserProfile (nếu có entity riêng)
+│   │   ├── repository/               # Repositories
+│   │   └── service/                  # UserService (SOLID: Single Responsibility)
+│   ├── src/main/resources/
+│   │   ├── application.properties
+│   │   └── application-docker.properties
+│   ├── src/test/java/                # Tests
+│   ├── Dockerfile
+│   └── pom.xml
+│
+├── 🐘 postgres/
+│   └── init.sql                      # Creates auth_service & user_service databases
+│
+├── 📚 docs/
+│   └── project_review.md             # Comprehensive code review & recommendations
+│
+├── 🔧 Configuration Files
+│   ├── docker-compose.yaml           # Multi-container orchestration
+│   ├── .gitlab-ci.yml                # CI/CD pipeline (build, test, deploy)
+│   ├── .dockerignore
+│   ├── .gitignore
+│   ├── .env                          # Environment variables (not in git)
+│   └── pom.xml                       # Parent POM with dependency management
+│
+└── 📖 README.md                       # This file
+```
+
+### 🎯 Design Patterns Implemented (Task 10: SOLID)
+
+| Pattern | Location | Purpose |
+|---------|----------|---------|
+| **Strategy** | `auth-service/strategy/` | Multiple authentication methods (Password, OAuth planned) |
+| **Builder** | `auth-service/security/JwtClaimsBuilder` | Clean JWT claims construction |
+| **Factory** | Service layer injection | AuthenticationService selects strategy |
+| **Repository** | `core/repository/` | Data access abstraction |
+| **DTO** | All `dto/` packages | Data transfer without exposing entities |
+
+### 🔐 SOLID Principles Application
+
+- **S** (Single Responsibility): Each service has one clear purpose
+- **O** (Open/Closed): Strategy pattern allows extending auth methods without modifying existing code
+- **L** (Liskov Substitution): All strategies implement `AuthenticationStrategy` interface
+- **I** (Interface Segregation): Separate interfaces for different services
+- **D** (Dependency Inversion): Depends on abstractions (interfaces), not concrete implementations
 
 
 ## Biến môi trường
