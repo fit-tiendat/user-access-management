@@ -18,9 +18,10 @@ public class ProfileServiceImpl implements ProfileService {
 
     @Override
     @Transactional
-    public Profile upsert(ProfileDto dto) {
-        Profile p = repo.findByUsername(dto.username())
-                .orElseGet(() -> Profile.builder().username(dto.username()).build());
+    public Profile upsert(String username, ProfileDto dto) {
+        Profile p = repo.findByUsername(username)
+                .orElseGet(() -> Profile.builder().username(username).build());
+
         p.setFullName(dto.fullName());
         p.setEmail(dto.email());
         return repo.save(p);
@@ -40,7 +41,7 @@ public class ProfileServiceImpl implements ProfileService {
     @Override
     @Transactional
     public void deleteByUsername(String username) {
-        long affected = repo.deleteByUsername(username); // JPA sẽ trả số hàng xóa
+        long affected = repo.deleteByUsername(username);
         if (affected == 0) {
             throw new NotFoundException("Profile not found");
         }

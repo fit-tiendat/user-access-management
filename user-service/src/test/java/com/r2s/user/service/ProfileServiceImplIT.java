@@ -24,6 +24,7 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 @Transactional
 @Testcontainers
 class ProfileServiceImplIT {
+
     @Container
     static PostgreSQLContainer<?> postgres =
             new PostgreSQLContainer<>("postgres:16-alpine")
@@ -38,7 +39,6 @@ class ProfileServiceImplIT {
         registry.add("spring.datasource.password", postgres::getPassword);
     }
 
-
     @Autowired ProfileService profileService;
     @Autowired ProfileRepository profileRepository;
 
@@ -46,52 +46,53 @@ class ProfileServiceImplIT {
     @DisplayName("upsert: chưa có profile -> tạo mới")
     void upsert_creates_profile_when_not_exists() {
         // given
+        String username = "alice_it";
         ProfileDto dto = new ProfileDto(
-                "alice_it",
                 "Alice Integration",
                 "alice.it@mail.com"
         );
 
         // when
-        Profile saved = profileService.upsert(dto);
+        Profile saved = profileService.upsert(username, dto);
 
         // then
         assertThat(saved.getId()).isNotNull();
-        assertThat(saved.getUsername()).isEqualTo("alice_it");
+        assertThat(saved.getUsername()).isEqualTo(username);
         assertThat(saved.getFullName()).isEqualTo("Alice Integration");
         assertThat(saved.getEmail()).isEqualTo("alice.it@mail.com");
 
         // kiểm tra DB thực sự có record
-        Profile inDb = profileRepository.findByUsername("alice_it").orElseThrow();
+        Profile inDb = profileRepository.findByUsername(username).orElseThrow();
         assertThat(inDb.getFullName()).isEqualTo("Alice Integration");
+        assertThat(inDb.getEmail()).isEqualTo("alice.it@mail.com");
     }
 
     @Test
     @DisplayName("upsert: đã có profile -> update fullName & email")
     void upsert_updates_existing_profile() {
         // given: profile có sẵn
+        String username = "bob_it";
         Profile existing = Profile.builder()
-                .username("bob_it")
+                .username(username)
                 .fullName("Bob Old")
                 .email("old@mail.com")
                 .build();
         profileRepository.save(existing);
 
         ProfileDto dto = new ProfileDto(
-                "bob_it",
                 "Bob New",
                 "new@mail.com"
         );
 
         // when
-        Profile updated = profileService.upsert(dto);
+        Profile updated = profileService.upsert(username, dto);
 
         // then
-        assertThat(updated.getUsername()).isEqualTo("bob_it");
+        assertThat(updated.getUsername()).isEqualTo(username);
         assertThat(updated.getFullName()).isEqualTo("Bob New");
         assertThat(updated.getEmail()).isEqualTo("new@mail.com");
 
-        Profile inDb = profileRepository.findByUsername("bob_it").orElseThrow();
+        Profile inDb = profileRepository.findByUsername(username).orElseThrow();
         assertThat(inDb.getFullName()).isEqualTo("Bob New");
         assertThat(inDb.getEmail()).isEqualTo("new@mail.com");
     }
@@ -99,57 +100,58 @@ class ProfileServiceImplIT {
     @Test
     @DisplayName("getByUsername: không tìm thấy -> NotFoundException")
     void getByUsername_throws_when_not_found() {
-        // when + then
         assertThrows(NotFoundException.class,
                 () -> profileService.getByUsername("missing-user"));
     }
+
     @Test
     @DisplayName("getByUsername: tìm thấy -> trả về Profile")
     void getByUsername_returns_profile_when_found() {
-        // given: đã có 1 profile trong DB
+        // given
+        String username = "charlie_it";
         Profile existing = Profile.builder()
-                .username("charlie_it")
+                .username(username)
                 .fullName("Charlie Integration")
                 .email("charlie.it@mail.com")
                 .build();
         profileRepository.save(existing);
 
         // when
-        Profile found = profileService.getByUsername("charlie_it");
+        Profile found = profileService.getByUsername(username);
 
         // then
         assertThat(found.getId()).isNotNull();
-        assertThat(found.getUsername()).isEqualTo("charlie_it");
+        assertThat(found.getUsername()).isEqualTo(username);
         assertThat(found.getFullName()).isEqualTo("Charlie Integration");
         assertThat(found.getEmail()).isEqualTo("charlie.it@mail.com");
     }
+
     @Test
     @DisplayName("deleteByUsername: tồn tại -> xóa thành công")
     void deleteByUsername_deletes_when_exists() {
         // given
+        String username = "will_delete";
         Profile existing = Profile.builder()
-                .username("will_delete")
+                .username(username)
                 .fullName("To Delete")
                 .email("delete@mail.com")
                 .build();
         profileRepository.save(existing);
 
         // sanity check
-        assertThat(profileRepository.findByUsername("will_delete")).isPresent();
+        assertThat(profileRepository.findByUsername(username)).isPresent();
 
         // when
-        profileService.deleteByUsername("will_delete");
+        profileService.deleteByUsername(username);
 
-        // then: không còn trong DB
-        assertThat(profileRepository.findByUsername("will_delete")).isEmpty();
+        // then
+        assertThat(profileRepository.findByUsername(username)).isEmpty();
     }
 
     @Test
     @DisplayName("deleteByUsername: không tồn tại -> NotFoundException")
     void deleteByUsername_throws_when_not_exists() {
-        // when + then
         assertThrows(NotFoundException.class,
                 () -> profileService.deleteByUsername("missing-user"));
     }
-
 }

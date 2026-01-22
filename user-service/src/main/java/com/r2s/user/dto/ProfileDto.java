@@ -6,10 +6,11 @@ import jakarta.validation.constraints.Pattern;
 
 public record ProfileDto(
 
-        @NotBlank
-        @Pattern(regexp = "^\\S+$", message = "Username must not contain spaces")
-        String username,
+//        @NotBlank
+//        @Pattern(regexp = "^\\S+$", message = "Username must not contain spaces")
+//        String username,
 
+        @NotBlank
         String fullName,
 
         @NotBlank @Email

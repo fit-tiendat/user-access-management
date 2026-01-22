@@ -1,11 +1,16 @@
-package com.r2s.user.controller;// import thêm:
+package com.r2s.user.controller;
+
+import com.r2s.core.dto.ApiResponse;
+import com.r2s.core.utils.ResponseBuilder;
 import com.r2s.user.dto.ProfileDto;
 import com.r2s.user.dto.ProfileResponse;
 import com.r2s.user.entity.Profile;
-import com.r2s.user.service.ProfileService;
+import com.r2s.user.service.ProfileCommandService;
+import com.r2s.user.service.ProfileQueryService;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.Pattern;
 import lombok.RequiredArgsConstructor;
+import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.validation.annotation.Validated;
@@ -20,9 +25,11 @@ import java.util.List;
 @RequiredArgsConstructor
 public class ProfileController {
 
-    private final ProfileService service;
+    private final ProfileCommandService commandService;
+    private final ProfileQueryService queryService;
 
-    // ===== helper =====
+    private final @Qualifier("r2sResponseBuilder") ResponseBuilder responseBuilder;
+
     private String requireUsername(Principal principal) {
         if (principal == null || principal.getName() == null) {
             throw new IllegalStateException("Authentication is missing");
@@ -39,49 +46,43 @@ public class ProfileController {
         );
     }
 
-    // ===== API =====
-
-    // user tự xem profile của mình
     @GetMapping("/me")
-    public ResponseEntity<ProfileResponse> me(Principal principal) {
+    public ResponseEntity<ApiResponse<ProfileResponse>> me(Principal principal) {
         String username = requireUsername(principal);
-        Profile profile = service.getByUsername(username);
-        return ResponseEntity.ok(toResponse(profile));
+        Profile profile = queryService.getByUsername(username);
+        return responseBuilder.ok(toResponse(profile), "Profile retrieved successfully");
     }
 
-    // user tự cập nhật profile của mình
     @PutMapping("/me")
-    public ResponseEntity<ProfileResponse> upsertMe(Principal principal,
-                                                    @Valid @RequestBody ProfileDto dto) {
+    public ResponseEntity<ApiResponse<ProfileResponse>> upsertMe(
+            Principal principal,
+            @Valid @RequestBody ProfileDto dto
+    ) {
         String username = requireUsername(principal);
 
-        // ép username theo token, bỏ qua username client gửi lên
-        Profile saved = service.upsert(
-                new ProfileDto(username, dto.fullName(), dto.email())
-        );
-        return ResponseEntity.ok(toResponse(saved));
+        Profile saved = commandService.upsert(username, dto);
+        return responseBuilder.ok(toResponse(saved), "Profile updated successfully");
     }
 
-    // ADMIN xem tất cả profile
     @GetMapping
     @PreAuthorize("hasRole('ADMIN')")
-    public ResponseEntity<List<ProfileResponse>> all() {
-        List<ProfileResponse> result = service.getAll()
+    public ResponseEntity<ApiResponse<List<ProfileResponse>>> all() {
+        List<ProfileResponse> result = queryService.getAll()
                 .stream()
                 .map(this::toResponse)
                 .toList();
-        return ResponseEntity.ok(result);
+
+        return responseBuilder.ok(result, "Profiles retrieved successfully");
     }
 
-    // ADMIN xóa theo username
     @DeleteMapping("/{username}")
     @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<Void> delete(
             @PathVariable("username")
             @Pattern(regexp = "^\\S+$", message = "Username must not contain spaces")
-            String username) {
-
-        service.deleteByUsername(username);
+            String username
+    ) {
+        commandService.deleteByUsername(username);
         return ResponseEntity.noContent().build();
     }
 }
