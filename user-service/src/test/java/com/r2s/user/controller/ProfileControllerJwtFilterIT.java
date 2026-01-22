@@ -44,11 +44,10 @@ class ProfileControllerJwtFilterIT {
     private static final String DUMMY_TOKEN = "any.jwt.token";
 
     @Container
-    static PostgreSQLContainer<?> postgres =
-            new PostgreSQLContainer<>("postgres:16-alpine")
-                    .withDatabaseName("user_access_management")
-                    .withUsername("postgres")
-                    .withPassword("d433221dat");
+    static PostgreSQLContainer<?> postgres = new PostgreSQLContainer<>("postgres:13-alpine")
+            .withDatabaseName("user_access_management")
+            .withUsername("postgres")
+            .withPassword("d433221dat");
 
     @DynamicPropertySource
     static void overrideProps(DynamicPropertyRegistry registry) {
@@ -57,13 +56,18 @@ class ProfileControllerJwtFilterIT {
         registry.add("spring.datasource.password", postgres::getPassword);
     }
 
-    @Autowired MockMvc mockMvc;
-    @Autowired ObjectMapper objectMapper;
+    @Autowired
+    MockMvc mockMvc;
+    @Autowired
+    ObjectMapper objectMapper;
 
-    @Autowired ProfileRepository profileRepository;
+    @Autowired
+    ProfileRepository profileRepository;
 
-    @MockBean JwtService jwtService;
-    @MockBean UserDetailsService userDetailsService;
+    @MockBean
+    JwtService jwtService;
+    @MockBean
+    UserDetailsService userDetailsService;
 
     @BeforeEach
     void setUp() {
@@ -111,9 +115,9 @@ class ProfileControllerJwtFilterIT {
         ProfileDto body = new ProfileDto("New Name", "new@mail.com");
 
         mockMvc.perform(put(BASE + "/me")
-                        .header("Authorization", authHeader)
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content(objectMapper.writeValueAsString(body)))
+                .header("Authorization", authHeader)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(objectMapper.writeValueAsString(body)))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.data.username").value("alice"))
                 .andExpect(jsonPath("$.data.fullName").value("New Name"))
@@ -134,8 +138,7 @@ class ProfileControllerJwtFilterIT {
 
         profileRepository.saveAll(List.of(
                 Profile.builder().username("alice").fullName("Alice").email("a@mail.com").build(),
-                Profile.builder().username("bob").fullName("Bob").email("b@mail.com").build()
-        ));
+                Profile.builder().username("bob").fullName("Bob").email("b@mail.com").build()));
 
         mockMvc.perform(get(BASE).header("Authorization", authHeader))
                 .andExpect(status().isOk())
@@ -193,7 +196,7 @@ class ProfileControllerJwtFilterIT {
         given(jwtService.isSignatureAndExpiryValid(eq(token))).willReturn(false);
 
         mockMvc.perform(get(BASE)
-                        .header("Authorization", "Bearer " + token))
+                .header("Authorization", "Bearer " + token))
                 .andExpect(status().isUnauthorized());
     }
 }

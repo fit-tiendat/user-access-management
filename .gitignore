@@ -29,7 +29,8 @@ Thumbs.db
 # Binary documentation files (share via link instead)
 docs/
 
-# Log files
+# Log files and directories
+logs/
 *.log
 
 # Temporary files
