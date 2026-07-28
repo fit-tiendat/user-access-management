@@ -89,7 +89,7 @@ class AuthControllerJwtFilterIT {
     void register_should200_when_valid() throws Exception {
         RegisterRequest req = new RegisterRequest();
         req.setUsername("alice1");
-        req.setPassword("secret123");
+        req.setPassword("Strong@123");
         req.setRole(Role.ROLE_USER);
 
         mockMvc.perform(post(BASE + "/register")
@@ -107,7 +107,7 @@ class AuthControllerJwtFilterIT {
         String json = """
                 {
                   "username": "abc",
-                  "password": "123456"
+                  "password": "Strong@123"
                 }
                 """;
 

@@ -46,7 +46,7 @@ class AuthControllerWebMvcTest {
     void register_shouldReturn200_andSuccessMessage() throws Exception {
         // build JSON trực tiếp để khỏi cần constructor DTO
         String body = """
-                  {"username":"john","password":"secret123"}
+                  {"username":"john","password":"Strong@123"}
                 """;
 
         mockMvc.perform(post("/api/v1/auth/register")
@@ -77,13 +77,27 @@ class AuthControllerWebMvcTest {
     @Test
     void register_should400_whenUsernameHasWhitespace() throws Exception {
         String body = """
-                  {"username":"john doe","password":"secret123"}
+                  {"username":"john doe","password":"Strong@123"}
                 """;
 
         mockMvc.perform(post("/api/v1/auth/register")
                         .contentType(APPLICATION_JSON)
                         .content(body))
                 .andExpect(status().isBadRequest());
+    }
+
+    @Test
+    void register_should400_whenPasswordDoesNotMeetPolicy() throws Exception {
+        String body = """
+                  {"username":"john","password":"password123"}
+                """;
+
+        mockMvc.perform(post("/api/v1/auth/register")
+                        .contentType(APPLICATION_JSON)
+                        .content(body))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.errorCode").value("VALIDATION_ERROR"))
+                .andExpect(jsonPath("$.data.password").exists());
     }
 
     @Test
@@ -104,7 +118,7 @@ class AuthControllerWebMvcTest {
     @Test
     void register_should400_whenUsernameHasWhitespace_andReturnErrorMap() throws Exception {
         String body = """
-                  {"username":"john doe","password":"secret123"}
+                  {"username":"john doe","password":"Strong@123"}
                 """;
 
         mockMvc.perform(post("/api/v1/auth/register")
@@ -140,7 +154,7 @@ class AuthControllerWebMvcTest {
                 .when(register).register(any());
 
         String body = """
-                  {"username":"john","password":"secret123"}
+                  {"username":"john","password":"Strong@123"}
                 """;
 
         mockMvc.perform(post("/api/v1/auth/register")

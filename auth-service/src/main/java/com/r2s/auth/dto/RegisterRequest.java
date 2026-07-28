@@ -1,6 +1,7 @@
 package com.r2s.auth.dto;
 
 
+import com.r2s.auth.validation.StrongPassword;
 import com.r2s.core.entity.Role;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.Pattern;
@@ -19,7 +20,7 @@ public class RegisterRequest {
     private String username;
 
     @NotBlank
-    @Size(min = 6, max = 100)
+    @StrongPassword
     private String password;
 
     private Role role ;// USER, ADMIN, MODERATOR

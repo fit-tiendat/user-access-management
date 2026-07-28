@@ -70,13 +70,13 @@ public class E2EFlowTest {
     @Order(1)
     void register_and_login_user() {
         given().contentType("application/json")
-                .body(Map.of("username", "alice", "password", "secret123"))
+                .body(Map.of("username", "alice", "password", "Strong@123"))
                 .when().post(authBase + "/register")
                 .then().statusCode(200);
 
         aliceToken =
                 given().contentType("application/json")
-                        .body(Map.of("username", "alice", "password", "secret123"))
+                        .body(Map.of("username", "alice", "password", "Strong@123"))
                         .when().post(authBase + "/login")
                         .then().statusCode(200)
                         .body("token", not(emptyString()))
@@ -108,13 +108,13 @@ public class E2EFlowTest {
     @Order(3)
     void register_and_login_admin_then_list_and_delete() {
         given().contentType("application/json")
-                .body(Map.of("username", "admin", "password", "admin123", "role", "ROLE_ADMIN"))
+                .body(Map.of("username", "admin", "password", "Admin@1234", "role", "ROLE_ADMIN"))
                 .when().post(authBase + "/register")
                 .then().statusCode(200);
 
         adminToken =
                 given().contentType("application/json")
-                        .body(Map.of("username", "admin", "password", "admin123"))
+                        .body(Map.of("username", "admin", "password", "Admin@1234"))
                         .when().post(authBase + "/login")
                         .then().statusCode(200)
                         .body("token", not(emptyString()))
