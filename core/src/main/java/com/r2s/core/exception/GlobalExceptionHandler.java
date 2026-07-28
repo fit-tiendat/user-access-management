@@ -2,7 +2,6 @@ package com.r2s.core.exception;
 
 import com.r2s.core.dto.ApiErrorCode;
 import com.r2s.core.dto.ApiResponse;
-import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.ConstraintViolationException;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpStatus;
@@ -97,16 +96,8 @@ public class GlobalExceptionHandler {
     }
 
     @ExceptionHandler(Exception.class)
-    public ResponseEntity<ApiResponse<Object>> handleAll(
-            Exception ex,
-            HttpServletRequest request
-    ) {
-        log.error(
-                "Unhandled exception: method={}, path={}",
-                request.getMethod(),
-                request.getRequestURI(),
-                ex
-        );
+    public ResponseEntity<ApiResponse<Object>> handleAll(Exception ex) {
+        log.error("Unhandled request exception: type={}", ex.getClass().getName());
         return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
                 .body(ApiResponse.failed(
                         ApiErrorCode.INTERNAL_ERROR.name(),
