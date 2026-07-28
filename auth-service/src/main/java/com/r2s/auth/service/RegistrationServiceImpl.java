@@ -5,19 +5,19 @@ import com.r2s.core.entity.Role;
 import com.r2s.core.entity.User;
 import com.r2s.core.exception.ConflictException;
 import com.r2s.core.repository.UserRepository;
+import com.r2s.core.security.audit.SecurityAuditLogger;
 import lombok.RequiredArgsConstructor;
-import lombok.extern.slf4j.Slf4j;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-@Slf4j
 @Service
 @RequiredArgsConstructor
 public class RegistrationServiceImpl implements RegistrationService {
 
     private final UserRepository userRepository;
     private final PasswordEncoder passwordEncoder;
+    private final SecurityAuditLogger securityAuditLogger;
 
     @Override
     @Transactional
@@ -25,7 +25,7 @@ public class RegistrationServiceImpl implements RegistrationService {
         String username = request.getUsername();
 
         if (userRepository.existsByUsername(username)) {
-            log.warn("Register rejected: duplicate username={}", username);
+            securityAuditLogger.registrationRejected(username, "duplicate_username");
             throw new ConflictException("Username already exists");
         }
 
@@ -38,6 +38,6 @@ public class RegistrationServiceImpl implements RegistrationService {
                 .build();
 
         userRepository.save(user);
-        log.info("Register success: username={}, role={}", username, role);
+        securityAuditLogger.registrationSucceeded(username, role);
     }
 }

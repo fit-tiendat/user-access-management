@@ -1,6 +1,7 @@
 package com.r2s.auth.security.ratelimit;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.r2s.core.security.audit.SecurityAuditLogger;
 import jakarta.servlet.FilterChain;
 import org.junit.jupiter.api.Test;
 import org.springframework.http.HttpStatus;
@@ -16,9 +17,11 @@ import static org.mockito.Mockito.verify;
 class AuthRateLimitFilterTest {
 
     private final AuthRateLimitProperties properties = new AuthRateLimitProperties();
+    private final SecurityAuditLogger securityAuditLogger = mock(SecurityAuditLogger.class);
     private final AuthRateLimitFilter filter = new AuthRateLimitFilter(
             properties,
             new ObjectMapper().findAndRegisterModules(),
+            securityAuditLogger,
             "/api/v1"
     );
     private final FilterChain filterChain = mock(FilterChain.class);
@@ -37,6 +40,7 @@ class AuthRateLimitFilterTest {
         assertThat(rejected.getHeader("X-RateLimit-Remaining")).isEqualTo("0");
         assertThat(rejected.getContentAsString()).contains("Too many authentication attempts");
         verify(filterChain, times(5)).doFilter(any(), any());
+        verify(securityAuditLogger).rateLimitExceeded("login", "192.0.2.10");
     }
 
     @Test

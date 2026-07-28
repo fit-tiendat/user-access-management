@@ -5,13 +5,13 @@ import com.github.benmanes.caffeine.cache.Cache;
 import com.github.benmanes.caffeine.cache.Caffeine;
 import com.r2s.core.dto.ApiErrorCode;
 import com.r2s.core.dto.ApiResponse;
+import com.r2s.core.security.audit.SecurityAuditLogger;
 import io.github.bucket4j.Bucket;
 import io.github.bucket4j.ConsumptionProbe;
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
-import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Profile;
 import org.springframework.core.Ordered;
@@ -27,7 +27,6 @@ import java.io.IOException;
 import java.time.Duration;
 import java.util.concurrent.TimeUnit;
 
-@Slf4j
 @Component
 @Profile("!test")
 @Order(Ordered.HIGHEST_PRECEDENCE + 10)
@@ -38,6 +37,7 @@ public class AuthRateLimitFilter extends OncePerRequestFilter {
 
     private final AuthRateLimitProperties properties;
     private final ObjectMapper objectMapper;
+    private final SecurityAuditLogger securityAuditLogger;
     private final Cache<String, Bucket> buckets;
     private final String loginPath;
     private final String registerPath;
@@ -45,10 +45,12 @@ public class AuthRateLimitFilter extends OncePerRequestFilter {
     public AuthRateLimitFilter(
             AuthRateLimitProperties properties,
             ObjectMapper objectMapper,
+            SecurityAuditLogger securityAuditLogger,
             @Value("${api.base-path:/api/v1}") String apiBasePath
     ) {
         this.properties = properties;
         this.objectMapper = objectMapper;
+        this.securityAuditLogger = securityAuditLogger;
 
         String normalizedBasePath = apiBasePath.endsWith("/")
                 ? apiBasePath.substring(0, apiBasePath.length() - 1)
@@ -103,7 +105,7 @@ public class AuthRateLimitFilter extends OncePerRequestFilter {
                 )
         );
 
-        log.warn("Rate limit exceeded: endpoint={}, clientIp={}", policyName, clientIp);
+        securityAuditLogger.rateLimitExceeded(policyName, clientIp);
         response.setStatus(HttpStatus.TOO_MANY_REQUESTS.value());
         response.setHeader(HttpHeaders.RETRY_AFTER, Long.toString(retryAfterSeconds));
         response.setContentType(MediaType.APPLICATION_JSON_VALUE);

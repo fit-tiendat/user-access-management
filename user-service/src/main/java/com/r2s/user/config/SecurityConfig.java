@@ -1,6 +1,7 @@
 package com.r2s.user.config;
 
 import com.r2s.core.security.JwtFilter;
+import com.r2s.core.security.audit.SecurityAuditLogger;
 import lombok.RequiredArgsConstructor;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -19,6 +20,7 @@ import jakarta.servlet.http.HttpServletResponse;
 public class SecurityConfig {
 
     private final JwtFilter jwtFilter;
+    private final SecurityAuditLogger securityAuditLogger;
 
     @Bean
     SecurityFilterChain filterChain(HttpSecurity http) throws Exception {
@@ -45,13 +47,26 @@ public class SecurityConfig {
                 // 🔻 PHẦN QUAN TRỌNG: map 401 & 403
                 .exceptionHandling(ex -> ex
                         // Chưa đăng nhập / thiếu token / không có Authentication -> 401
-                        .authenticationEntryPoint((request, response, authException) ->
-                                response.sendError(HttpServletResponse.SC_UNAUTHORIZED, "Unauthorized")
-                        )
+                        .authenticationEntryPoint((request, response, authException) -> {
+                            securityAuditLogger.authenticationRejected(
+                                    request.getMethod(),
+                                    request.getRequestURI(),
+                                    request.getRemoteAddr()
+                            );
+                            response.sendError(HttpServletResponse.SC_UNAUTHORIZED, "Unauthorized");
+                        })
                         // Đã auth nhưng không đủ quyền (sai role) -> 403
-                        .accessDeniedHandler((request, response, accessDeniedException) ->
-                                response.sendError(HttpServletResponse.SC_FORBIDDEN, "Forbidden")
-                        )
+                        .accessDeniedHandler((request, response, accessDeniedException) -> {
+                            securityAuditLogger.authorizationRejected(
+                                    request.getMethod(),
+                                    request.getRequestURI(),
+                                    request.getRemoteAddr(),
+                                    request.getUserPrincipal() == null
+                                            ? "unknown"
+                                            : request.getUserPrincipal().getName()
+                            );
+                            response.sendError(HttpServletResponse.SC_FORBIDDEN, "Forbidden");
+                        })
                 )
 
                 .headers(h -> h.frameOptions(frame -> frame.disable()))

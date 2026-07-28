@@ -37,6 +37,19 @@
 		</encoder>
 	</appender>
 
+	<!-- Dedicated structured security audit log (never log passwords or tokens). -->
+	<appender name="SECURITY_FILE" class="ch.qos.logback.core.rolling.RollingFileAppender">
+		<file>${LOG_PATH}/security-audit.json</file>
+		<rollingPolicy class="ch.qos.logback.core.rolling.TimeBasedRollingPolicy">
+			<fileNamePattern>${LOG_PATH}/security-audit.%d{yyyy-MM-dd}.json</fileNamePattern>
+			<maxHistory>90</maxHistory>
+		</rollingPolicy>
+		<encoder class="org.springframework.boot.logging.logback.StructuredLogEncoder">
+			<format>logstash</format>
+			<charset>UTF-8</charset>
+		</encoder>
+	</appender>
+
 	<!-- Console -->
 	<appender name="CONSOLE" class="ch.qos.logback.core.ConsoleAppender">
 		<encoder>
@@ -46,6 +59,10 @@
 
 	<logger name="org.springframework.web" level="INFO"/>
 	<logger name="com.r2s" level="DEBUG"/>
+	<logger name="SECURITY_AUDIT" level="INFO" additivity="false">
+		<appender-ref ref="SECURITY_FILE"/>
+		<appender-ref ref="CONSOLE"/>
+	</logger>
 
 	<root level="INFO">
 		<appender-ref ref="INFO_FILE"/>

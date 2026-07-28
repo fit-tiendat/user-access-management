@@ -1,6 +1,7 @@
 package com.r2s.auth.config;
 
 import com.r2s.core.security.JwtFilter;
+import com.r2s.core.security.audit.SecurityAuditLogger;
 import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
@@ -26,6 +27,7 @@ public class SecurityConfig {
 
     private final JwtFilter jwtFilter;
     private final UserDetailsService userDetailsService;
+    private final SecurityAuditLogger securityAuditLogger;
 
     // cùng property với AuthController: "${api.base-path:/api/v1}"
     @Value("${api.base-path:/api/v1}")
@@ -60,11 +62,22 @@ public class SecurityConfig {
                 // cấu hình 401 / 403 rõ ràng
                 .exceptionHandling(ex -> ex
                         .authenticationEntryPoint((req, res, e) -> {
-                            // thiếu hoặc token invalid -> 401
+                            securityAuditLogger.authenticationRejected(
+                                    req.getMethod(),
+                                    req.getRequestURI(),
+                                    req.getRemoteAddr()
+                            );
                             res.sendError(HttpStatus.UNAUTHORIZED.value(), "Unauthorized");
                         })
                         .accessDeniedHandler((req, res, e) -> {
-                            // đã auth nhưng thiếu quyền (sai role) -> 403
+                            securityAuditLogger.authorizationRejected(
+                                    req.getMethod(),
+                                    req.getRequestURI(),
+                                    req.getRemoteAddr(),
+                                    req.getUserPrincipal() == null
+                                            ? "unknown"
+                                            : req.getUserPrincipal().getName()
+                            );
                             res.sendError(HttpStatus.FORBIDDEN.value(), "Forbidden");
                         })
                 )
