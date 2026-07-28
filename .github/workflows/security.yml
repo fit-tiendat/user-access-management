@@ -6,8 +6,6 @@ on:
       - main
       - "review/**"
   pull_request:
-    branches:
-      - main
   schedule:
     - cron: "17 2 * * 1"
   workflow_dispatch:
