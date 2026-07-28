@@ -22,8 +22,8 @@ public class ProfileServiceImpl implements ProfileService {
         Profile p = repo.findByUsername(username)
                 .orElseGet(() -> Profile.builder().username(username).build());
 
-        p.setFullName(dto.fullName());
-        p.setEmail(dto.email());
+        p.setFullName(dto.fullName().trim().replaceAll(" +", " "));
+        p.setEmail(dto.email().trim());
         return repo.save(p);
     }
 

@@ -2,6 +2,7 @@ package com.r2s.user.controller;
 
 import com.r2s.core.dto.ApiResponse;
 import com.r2s.core.utils.ResponseBuilder;
+import com.r2s.core.utils.ValidationPatterns;
 import com.r2s.user.dto.ProfileDto;
 import com.r2s.user.dto.ProfileResponse;
 import com.r2s.user.entity.Profile;
@@ -9,6 +10,7 @@ import com.r2s.user.service.ProfileCommandService;
 import com.r2s.user.service.ProfileQueryService;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.Pattern;
+import jakarta.validation.constraints.Size;
 import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.http.ResponseEntity;
@@ -79,7 +81,11 @@ public class ProfileController {
     @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<Void> delete(
             @PathVariable("username")
-            @Pattern(regexp = "^\\S+$", message = "Username must not contain spaces")
+            @Pattern(
+                    regexp = ValidationPatterns.USERNAME,
+                    message = ValidationPatterns.USERNAME_MESSAGE
+            )
+            @Size(min = 4, max = 30)
             String username
     ) {
         commandService.deleteByUsername(username);

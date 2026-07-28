@@ -131,6 +131,34 @@ class AuthControllerWebMvcTest {
     }
 
     @Test
+    void register_should400_whenUsernameContainsMarkup() throws Exception {
+        String body = """
+                  {"username":"<script>","password":"Strong@123"}
+                """;
+
+        mockMvc.perform(post("/api/v1/auth/register")
+                        .contentType(APPLICATION_JSON)
+                        .content(body))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.errorCode").value("VALIDATION_ERROR"))
+                .andExpect(jsonPath("$.data.username").exists());
+    }
+
+    @Test
+    void login_should400_whenUsernameContainsControlCharacters() throws Exception {
+        String body = """
+                  {"username":"john\\nadmin","password":"Strong@123"}
+                """;
+
+        mockMvc.perform(post("/api/v1/auth/login")
+                        .contentType(APPLICATION_JSON)
+                        .content(body))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.errorCode").value("VALIDATION_ERROR"))
+                .andExpect(jsonPath("$.data.username").exists());
+    }
+
+    @Test
     void login_should401_andMessage_onBadCredentials() throws Exception {
         // ném BadCredentialsException từ service
         when(authService.login(any())).thenThrow(new org.springframework.security.authentication.BadCredentialsException("bad"));

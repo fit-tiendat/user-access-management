@@ -144,6 +144,26 @@ class ProfileControllerWebMvcTest {
     }
 
     @Test
+    void updateMe_should400_whenFullNameContainsMarkup() throws Exception {
+        String json = """
+                {
+                  "fullName": "<script>alert(1)</script>",
+                  "email": "alice@mail.com"
+                }
+                """;
+
+        mockMvc.perform(put("/api/v1/users/me")
+                        .principal(principal("alice"))
+                        .contentType(APPLICATION_JSON)
+                        .content(json))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.errorCode").value("VALIDATION_ERROR"))
+                .andExpect(jsonPath("$.data.fullName").exists());
+
+        verifyNoInteractions(commandService, queryService);
+    }
+
+    @Test
     void updateMe_shouldUseUsernameFromPrincipal_andIgnoreBodyUsernameFieldIfSent() throws Exception {
         // Nếu client cố tình gửi username (dù DTO không có), Jackson sẽ ignore field lạ
         String json = """

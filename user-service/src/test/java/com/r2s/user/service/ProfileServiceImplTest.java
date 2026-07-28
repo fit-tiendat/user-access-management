@@ -55,12 +55,12 @@ class ProfileServiceImplTest {
         when(repo.findByUsername(username)).thenReturn(Optional.of(existing));
         when(repo.save(any(Profile.class))).thenAnswer(i -> i.getArgument(0));
 
-        var dto = new ProfileDto("New", "new@ex.com");
+        var dto = new ProfileDto("  New   Name  ", "  new@ex.com  ");
 
         Profile p = service.upsert(username, dto);
 
         assertThat(p.getUsername()).isEqualTo("john");
-        assertThat(p.getFullName()).isEqualTo("New");
+        assertThat(p.getFullName()).isEqualTo("New Name");
         assertThat(p.getEmail()).isEqualTo("new@ex.com");
 
         verify(repo).save(existing);
