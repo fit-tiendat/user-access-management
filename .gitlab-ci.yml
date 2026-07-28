@@ -11,7 +11,8 @@ variables:
   SPRING_PROFILES_ACTIVE: "docker"
 
   POSTGRES_USER: "postgres"
-  POSTGRES_PASSWORD: "d433221dat"
+  # CI_POSTGRES_PASSWORD must be configured as a protected, masked CI/CD variable.
+  POSTGRES_PASSWORD: "$CI_POSTGRES_PASSWORD"
 
   AUTH_DB: "auth_service"
   USER_DB: "user_service"
@@ -19,10 +20,11 @@ variables:
   SPRING_DATASOURCE_URL_AUTH: "jdbc:postgresql://postgres-db:5432/auth_service"
   SPRING_DATASOURCE_URL_USER: "jdbc:postgresql://postgres-db:5432/user_service"
   SPRING_DATASOURCE_USERNAME: "postgres"
-  SPRING_DATASOURCE_PASSWORD: "d433221dat"
+  SPRING_DATASOURCE_PASSWORD: "$CI_POSTGRES_PASSWORD"
 
   # JWT
-  JWT_SECRET: "w5h2Yk1Gd3dtdkFzT0h0bTFwM05XUnJvV0V1NHVZbU5yZFRyWW9oUUNmQ1hLcw=="
+  # CI_JWT_SECRET must be configured as a protected, masked CI/CD variable.
+  JWT_SECRET: "$CI_JWT_SECRET"
   JWT_EXP_MINUTES: "120"
 
 cache:
@@ -81,7 +83,7 @@ maven_test:
 
     # Chạy test toàn bộ, bỏ qua E2E cần Docker Compose
     - >
-      mvn -B clean test surefire-report:report
+      mvn -B clean verify surefire-report:report
       -DfailIfNoTests=false
       -Dsurefire.failIfNoSpecifiedTests=false
       -Dtest='*Test,!AuthE2EFlowTest,!E2EFlowTest'

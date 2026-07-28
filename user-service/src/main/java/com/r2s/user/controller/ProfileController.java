@@ -1,15 +1,27 @@
 package com.r2s.user.controller;
 
 import com.r2s.core.dto.ApiResponse;
+import com.r2s.core.dto.PageResponse;
 import com.r2s.core.utils.ResponseBuilder;
+import com.r2s.core.utils.ValidationPatterns;
 import com.r2s.user.dto.ProfileDto;
 import com.r2s.user.dto.ProfileResponse;
 import com.r2s.user.entity.Profile;
 import com.r2s.user.service.ProfileCommandService;
 import com.r2s.user.service.ProfileQueryService;
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.responses.ApiResponses;
+import io.swagger.v3.oas.annotations.security.SecurityRequirement;
+import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
+import jakarta.validation.constraints.Max;
+import jakarta.validation.constraints.Min;
 import jakarta.validation.constraints.Pattern;
+import jakarta.validation.constraints.Size;
 import lombok.RequiredArgsConstructor;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Sort;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
@@ -17,12 +29,15 @@ import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.*;
 
 import java.security.Principal;
-import java.util.List;
+
+import static com.r2s.core.config.OpenApiConfig.BEARER_AUTH;
 
 @Validated
 @RestController
 @RequestMapping("${api.base-path:/api/v1}/users")
 @RequiredArgsConstructor
+@Tag(name = "Profiles", description = "Authenticated profile management")
+@SecurityRequirement(name = BEARER_AUTH)
 public class ProfileController {
 
     private final ProfileCommandService commandService;
@@ -47,6 +62,12 @@ public class ProfileController {
     }
 
     @GetMapping("/me")
+    @Operation(summary = "Get the current user's profile")
+    @ApiResponses({
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "200", description = "Profile returned"),
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "401", description = "JWT is missing or invalid"),
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "404", description = "Profile does not exist")
+    })
     public ResponseEntity<ApiResponse<ProfileResponse>> me(Principal principal) {
         String username = requireUsername(principal);
         Profile profile = queryService.getByUsername(username);
@@ -54,6 +75,13 @@ public class ProfileController {
     }
 
     @PutMapping("/me")
+    @Operation(summary = "Create or update the current user's profile")
+    @ApiResponses({
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "200", description = "Profile saved"),
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "400", description = "Request validation failed"),
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "401", description = "JWT is missing or invalid"),
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "409", description = "Email is already in use")
+    })
     public ResponseEntity<ApiResponse<ProfileResponse>> upsertMe(
             Principal principal,
             @Valid @RequestBody ProfileDto dto
@@ -66,20 +94,42 @@ public class ProfileController {
 
     @GetMapping
     @PreAuthorize("hasRole('ADMIN')")
-    public ResponseEntity<ApiResponse<List<ProfileResponse>>> all() {
-        List<ProfileResponse> result = queryService.getAll()
-                .stream()
-                .map(this::toResponse)
-                .toList();
+    @Operation(summary = "List profiles", description = "Returns a username-sorted page of profiles")
+    @ApiResponses({
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "200", description = "Profile page returned"),
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "400", description = "Pagination parameters are invalid"),
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "401", description = "JWT is missing or invalid"),
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "403", description = "Administrator role is required")
+    })
+    public ResponseEntity<ApiResponse<PageResponse<ProfileResponse>>> all(
+            @RequestParam(name = "page", defaultValue = "0") @Min(0) int page,
+            @RequestParam(name = "size", defaultValue = "20") @Min(1) @Max(100) int size
+    ) {
+        Page<ProfileResponse> result = queryService.getAll(
+                        PageRequest.of(page, size, Sort.by("username").ascending())
+                )
+                .map(this::toResponse);
 
-        return responseBuilder.ok(result, "Profiles retrieved successfully");
+        return responseBuilder.ok(PageResponse.from(result), "Profiles retrieved successfully");
     }
 
     @DeleteMapping("/{username}")
     @PreAuthorize("hasRole('ADMIN')")
+    @Operation(summary = "Delete a profile")
+    @ApiResponses({
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "204", description = "Profile deleted"),
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "400", description = "Username is invalid"),
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "401", description = "JWT is missing or invalid"),
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "403", description = "Administrator role is required"),
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "404", description = "Profile does not exist")
+    })
     public ResponseEntity<Void> delete(
             @PathVariable("username")
-            @Pattern(regexp = "^\\S+$", message = "Username must not contain spaces")
+            @Pattern(
+                    regexp = ValidationPatterns.USERNAME,
+                    message = ValidationPatterns.USERNAME_MESSAGE
+            )
+            @Size(min = 4, max = 30)
             String username
     ) {
         commandService.deleteByUsername(username);

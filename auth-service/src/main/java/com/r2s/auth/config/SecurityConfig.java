@@ -1,6 +1,8 @@
 package com.r2s.auth.config;
 
 import com.r2s.core.security.JwtFilter;
+import com.r2s.core.security.ApiSecurityHeaders;
+import com.r2s.core.security.audit.SecurityAuditLogger;
 import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
@@ -18,6 +20,7 @@ import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
+import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
 
 @Configuration
 @EnableMethodSecurity(prePostEnabled = true) // Spring Security 6 / Boot 3
@@ -26,6 +29,8 @@ public class SecurityConfig {
 
     private final JwtFilter jwtFilter;
     private final UserDetailsService userDetailsService;
+    private final SecurityAuditLogger securityAuditLogger;
+    private final UrlBasedCorsConfigurationSource corsConfigurationSource;
 
     // cùng property với AuthController: "${api.base-path:/api/v1}"
     @Value("${api.base-path:/api/v1}")
@@ -39,11 +44,17 @@ public class SecurityConfig {
 
         http
                 .csrf(csrf -> csrf.disable())
+                .cors(cors -> cors.configurationSource(corsConfigurationSource))
                 .sessionManagement(sess ->
                         sess.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
                 .authorizeHttpRequests(auth -> auth
                         // public health/info
-                        .requestMatchers("/actuator/health", "/actuator/info").permitAll()
+                        .requestMatchers(
+                                "/actuator/health",
+                                "/actuator/health/**",
+                                "/actuator/info",
+                                "/actuator/prometheus"
+                        ).permitAll()
                         // chỉ mở đúng 2 endpoint auth public
                         .requestMatchers(registerPath, loginPath).permitAll()
                         // swagger public (nếu dùng)
@@ -60,15 +71,26 @@ public class SecurityConfig {
                 // cấu hình 401 / 403 rõ ràng
                 .exceptionHandling(ex -> ex
                         .authenticationEntryPoint((req, res, e) -> {
-                            // thiếu hoặc token invalid -> 401
+                            securityAuditLogger.authenticationRejected(
+                                    req.getMethod(),
+                                    req.getRequestURI(),
+                                    req.getRemoteAddr()
+                            );
                             res.sendError(HttpStatus.UNAUTHORIZED.value(), "Unauthorized");
                         })
                         .accessDeniedHandler((req, res, e) -> {
-                            // đã auth nhưng thiếu quyền (sai role) -> 403
+                            securityAuditLogger.authorizationRejected(
+                                    req.getMethod(),
+                                    req.getRequestURI(),
+                                    req.getRemoteAddr(),
+                                    req.getUserPrincipal() == null
+                                            ? "unknown"
+                                            : req.getUserPrincipal().getName()
+                            );
                             res.sendError(HttpStatus.FORBIDDEN.value(), "Forbidden");
                         })
                 )
-                .headers(h -> h.frameOptions(frame -> frame.disable()))
+                .headers(ApiSecurityHeaders.hardenedDefaults())
                 .authenticationProvider(authenticationProvider())
                 .addFilterBefore(jwtFilter, UsernamePasswordAuthenticationFilter.class);
 

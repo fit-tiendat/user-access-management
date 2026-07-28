@@ -1,0 +1,16 @@
+global:
+  resolve_timeout: 5m
+
+route:
+  receiver: operations-dashboard
+  group_by:
+    - alertname
+    - job
+  group_wait: 30s
+  group_interval: 5m
+  repeat_interval: 4h
+
+# Alerts remain visible and manageable in Alertmanager. Add the deployment's
+# email, Slack, PagerDuty, or webhook integration to this receiver.
+receivers:
+  - name: operations-dashboard

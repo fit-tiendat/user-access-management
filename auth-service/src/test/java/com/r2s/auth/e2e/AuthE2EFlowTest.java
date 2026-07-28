@@ -70,7 +70,7 @@ class AuthE2EFlowTest {
         given().contentType("application/json")
                 .body(Map.of(
                         "username", "tiendat",
-                        "password", "secret123"
+                        "password", "Strong@123"
                 ))
                 .when().post(authBase + "/register")
                 .then().statusCode(200);
@@ -83,7 +83,7 @@ class AuthE2EFlowTest {
         bobToken = given().contentType("application/json")
                 .body(Map.of(
                         "username", "tiendat",
-                        "password", "secret123"
+                        "password", "Strong@123"
                 ))
                 .when().post(authBase + "/login")
                 .then().statusCode(200)
@@ -111,8 +111,7 @@ class AuthE2EFlowTest {
         given().contentType("application/json")
                 .body(Map.of(
                         "username", "bob",
-                        "password", "another123",
-                        "role", "ROLE_USER"
+                        "password", "Another@123"
                 ))
                 .when().post(authBase + "/register")
                 .then().statusCode(anyOf(is(400), is(409)));

@@ -11,6 +11,7 @@ import com.r2s.core.entity.User;
 import com.r2s.core.exception.ConflictException;
 import com.r2s.core.repository.UserRepository;
 import com.r2s.core.security.JwtService;
+import com.r2s.core.security.audit.SecurityAuditLogger;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -42,6 +43,7 @@ class AuthServiceImplTest {
     @Mock AuthenticationManager authManager;
     @Mock JwtService jwtService;
     @Mock JwtClaimsBuilder claimsBuilder;
+    @Mock SecurityAuditLogger securityAuditLogger;
 
     // ===== Services under test =====
     RegistrationServiceImpl registrationService;
@@ -58,11 +60,19 @@ class AuthServiceImplTest {
     @BeforeEach
     void setUp() {
         // Registration service
-        registrationService = new RegistrationServiceImpl(userRepository, passwordEncoder);
+        registrationService = new RegistrationServiceImpl(
+                userRepository,
+                passwordEncoder,
+                securityAuditLogger
+        );
 
         // Real password strategy (logic login)
         passwordStrategy = new PasswordAuthenticationStrategy(
-                authManager, userRepository, jwtService, claimsBuilder
+                authManager,
+                userRepository,
+                jwtService,
+                claimsBuilder,
+                securityAuditLogger
         );
 
         // Authentication router: by default we inject 1 strategy mock
@@ -78,7 +88,6 @@ class AuthServiceImplTest {
         RegisterRequest req = new RegisterRequest();
         req.setUsername("john");
         req.setPassword("1234");
-        req.setRole(null); // default ROLE_USER
 
         when(userRepository.existsByUsername("john")).thenReturn(false);
         when(passwordEncoder.encode("1234")).thenReturn("ENC");
@@ -93,6 +102,7 @@ class AuthServiceImplTest {
         assertThat(u.getUsername()).isEqualTo("john");
         assertThat(u.getPassword()).isEqualTo("ENC");
         assertThat(u.getRole()).isEqualTo(Role.ROLE_USER);
+        verify(securityAuditLogger).registrationSucceeded("john", Role.ROLE_USER);
     }
 
     @Test
@@ -104,6 +114,7 @@ class AuthServiceImplTest {
 
         assertThrows(ConflictException.class, () -> registrationService.register(req));
         verify(userRepository, never()).save(any());
+        verify(securityAuditLogger).registrationRejected("john", "duplicate_username");
     }
 
     // =========================================================
@@ -162,6 +173,7 @@ class AuthServiceImplTest {
 
         assertThat(res.getToken()).isEqualTo("JWT-TOKEN");
         verify(jwtService).generateToken(eq("john"), argThat(m -> "ROLE_ADMIN".equals(m.get("role"))));
+        verify(securityAuditLogger).loginSucceeded("john", Role.ROLE_ADMIN);
     }
 
     @Test
@@ -175,6 +187,7 @@ class AuthServiceImplTest {
 
         verify(userRepository, never()).findByUsername(anyString());
         verify(jwtService, never()).generateToken(anyString(), anyMap());
+        verify(securityAuditLogger).loginFailed("john");
     }
 
     @Test

@@ -135,7 +135,7 @@ user-access-management/
 Tạo file `.env` (đã có mẫu trong repo). Điều chỉnh nếu cần:
 ```env
 POSTGRES_USER=postgres
-POSTGRES_PASSWORD=d433221dat
+POSTGRES_PASSWORD=REPLACE_WITH_A_SECRET
 POSTGRES_DB=postgres
 
 # Port mapping cho Postgres container (host:container)
@@ -207,7 +207,7 @@ Maintenance DB: postgres
 
 Username: postgres
 
-Password: (lấy từ .env, mặc định d433221dat)
+Password: lấy từ `.env`; không lưu mật khẩu thật trong tài liệu hoặc Git
 
 Save → Connect
 

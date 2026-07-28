@@ -16,6 +16,9 @@ import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMock
 import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
 import org.springframework.boot.test.mock.mockito.MockBean;
 import org.springframework.context.annotation.Import;
+import org.springframework.data.domain.PageImpl;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.web.servlet.MockMvc;
 
@@ -55,26 +58,44 @@ class ProfileControllerWebMvcTest {
                 Profile.builder().id(1L).username("alice").fullName("Alice").email("a@mail.com").build(),
                 Profile.builder().id(2L).username("bob").fullName("Bob").email("b@mail.com").build()
         );
-        given(queryService.getAll()).willReturn(list);
+        given(queryService.getAll(any(Pageable.class)))
+                .willReturn(new PageImpl<>(list, PageRequest.of(0, 20), 2));
 
         mockMvc.perform(get("/api/v1/users").accept(APPLICATION_JSON))
                 .andExpect(status().isOk())
                 .andExpect(content().contentTypeCompatibleWith(APPLICATION_JSON))
                 .andExpect(jsonPath("$.status").value("SUCCESS"))
-                .andExpect(jsonPath("$.data", hasSize(2)))
-                .andExpect(jsonPath("$.data[0].username").value("alice"))
-                .andExpect(jsonPath("$.data[1].username").value("bob"));
+                .andExpect(jsonPath("$.data.content", hasSize(2)))
+                .andExpect(jsonPath("$.data.content[0].username").value("alice"))
+                .andExpect(jsonPath("$.data.content[1].username").value("bob"))
+                .andExpect(jsonPath("$.data.pageNumber").value(0))
+                .andExpect(jsonPath("$.data.pageSize").value(20))
+                .andExpect(jsonPath("$.data.totalElements").value(2));
     }
 
     @Test
     void list_shouldReturn200_andEmptyArray() throws Exception {
-        given(queryService.getAll()).willReturn(List.of());
+        given(queryService.getAll(any(Pageable.class)))
+                .willReturn(new PageImpl<>(List.of(), PageRequest.of(0, 20), 0));
 
         mockMvc.perform(get("/api/v1/users").accept(APPLICATION_JSON))
                 .andExpect(status().isOk())
                 .andExpect(content().contentTypeCompatibleWith(APPLICATION_JSON))
                 .andExpect(jsonPath("$.status").value("SUCCESS"))
-                .andExpect(jsonPath("$.data", hasSize(0)));
+                .andExpect(jsonPath("$.data.content", hasSize(0)))
+                .andExpect(jsonPath("$.data.totalElements").value(0));
+    }
+
+    @Test
+    void list_shouldRejectPageSizeAboveLimit() throws Exception {
+                mockMvc.perform(get("/api/v1/users")
+                        .param("size", "101")
+                        .accept(APPLICATION_JSON))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.errorCode").value("VALIDATION_ERROR"))
+                .andExpect(jsonPath("$.message").value("Request validation failed"));
+
+        verifyNoInteractions(queryService);
     }
 
     @Test
@@ -94,6 +115,7 @@ class ProfileControllerWebMvcTest {
                 .andExpect(status().isNotFound())
                 .andExpect(content().contentTypeCompatibleWith(APPLICATION_JSON))
                 .andExpect(jsonPath("$.status").value("FAILED"))
+                .andExpect(jsonPath("$.errorCode").value("RESOURCE_NOT_FOUND"))
                 .andExpect(jsonPath("$.message").value("profile not found"));
     }
 
@@ -136,8 +158,28 @@ class ProfileControllerWebMvcTest {
                 .andExpect(status().isBadRequest())
                 .andExpect(content().contentTypeCompatibleWith(APPLICATION_JSON))
                 .andExpect(jsonPath("$.status").value("FAILED"))
-                .andExpect(jsonPath("$.message", containsString("email")))
-                .andExpect(jsonPath("$.message", containsString("must be a well-formed email address")));
+                .andExpect(jsonPath("$.errorCode").value("VALIDATION_ERROR"))
+                .andExpect(jsonPath("$.data.email", containsString("must be a well-formed email address")));
+
+        verifyNoInteractions(commandService, queryService);
+    }
+
+    @Test
+    void updateMe_should400_whenFullNameContainsMarkup() throws Exception {
+        String json = """
+                {
+                  "fullName": "<script>alert(1)</script>",
+                  "email": "alice@mail.com"
+                }
+                """;
+
+        mockMvc.perform(put("/api/v1/users/me")
+                        .principal(principal("alice"))
+                        .contentType(APPLICATION_JSON)
+                        .content(json))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.errorCode").value("VALIDATION_ERROR"))
+                .andExpect(jsonPath("$.data.fullName").exists());
 
         verifyNoInteractions(commandService, queryService);
     }

@@ -47,7 +47,7 @@ class ProfileControllerJwtFilterIT {
     static PostgreSQLContainer<?> postgres = new PostgreSQLContainer<>("postgres:13-alpine")
             .withDatabaseName("user_access_management")
             .withUsername("postgres")
-            .withPassword("d433221dat");
+            .withPassword("integration-test-only");
 
     @DynamicPropertySource
     static void overrideProps(DynamicPropertyRegistry registry) {

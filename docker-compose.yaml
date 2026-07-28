@@ -1,6 +1,9 @@
 services:
   postgres-db:
     image: postgres:13 # Flyway Community 11.7.2 fully supports PG 13
+    cpus: "${POSTGRES_CPU_LIMIT:-1.0}"
+    mem_limit: "${POSTGRES_MEMORY_LIMIT:-512m}"
+    pids_limit: 200
     environment:
       POSTGRES_USER: ${POSTGRES_USER}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
@@ -23,33 +26,135 @@ services:
     build:
       context: .
       dockerfile: auth-service/Dockerfile
+    cpus: "${AUTH_CPU_LIMIT:-0.75}"
+    mem_limit: "${AUTH_MEMORY_LIMIT:-512m}"
+    pids_limit: 200
     environment:
       SPRING_PROFILES_ACTIVE: ${SPRING_PROFILES_ACTIVE}
       SPRING_DATASOURCE_URL: ${SPRING_DATASOURCE_URL_AUTH}
       SPRING_DATASOURCE_USERNAME: ${SPRING_DATASOURCE_USERNAME}
       SPRING_DATASOURCE_PASSWORD: ${SPRING_DATASOURCE_PASSWORD}
       JWT_SECRET: ${JWT_SECRET}
+      JWT_PREVIOUS_SECRET: ${JWT_PREVIOUS_SECRET:-}
       JWT_EXP_MINUTES: "${JWT_EXP_MINUTES}"
+      MANAGEMENT_SERVER_PORT: "9081"
+      CORS_ALLOWED_ORIGINS: ${CORS_ALLOWED_ORIGINS:-https://localhost}
     depends_on:
       postgres-db:
         condition: service_healthy
     ports:
-      - "8081:8081"
+      - "127.0.0.1:${AUTH_DEBUG_PORT:-8081}:8081"
   user-service:
     build:
       context: .
       dockerfile: user-service/Dockerfile
+    cpus: "${USER_CPU_LIMIT:-0.75}"
+    mem_limit: "${USER_MEMORY_LIMIT:-512m}"
+    pids_limit: 200
     environment:
       SPRING_PROFILES_ACTIVE: ${SPRING_PROFILES_ACTIVE}
       SPRING_DATASOURCE_URL: ${SPRING_DATASOURCE_URL_USER}
       SPRING_DATASOURCE_USERNAME: ${SPRING_DATASOURCE_USERNAME}
       SPRING_DATASOURCE_PASSWORD: ${SPRING_DATASOURCE_PASSWORD}
       JWT_SECRET: ${JWT_SECRET}
+      JWT_PREVIOUS_SECRET: ${JWT_PREVIOUS_SECRET:-}
       JWT_EXP_MINUTES: "${JWT_EXP_MINUTES}"
+      MANAGEMENT_SERVER_PORT: "9082"
+      CORS_ALLOWED_ORIGINS: ${CORS_ALLOWED_ORIGINS:-https://localhost}
     depends_on:
       postgres-db:
         condition: service_healthy
     ports:
-      - "8082:8082"
+      - "127.0.0.1:${USER_DEBUG_PORT:-8082}:8082"
+
+  gateway:
+    image: caddy:2.11.4-alpine
+    cpus: "${GATEWAY_CPU_LIMIT:-0.50}"
+    mem_limit: "${GATEWAY_MEMORY_LIMIT:-256m}"
+    pids_limit: 100
+    restart: unless-stopped
+    environment:
+      PUBLIC_DOMAIN: ${PUBLIC_DOMAIN:-localhost}
+    volumes:
+      - ./gateway/Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+    depends_on:
+      auth-service:
+        condition: service_healthy
+      user-service:
+        condition: service_healthy
+    ports:
+      - "${HTTP_PORT:-80}:80"
+      - "${HTTPS_PORT:-443}:443"
+      - "${HTTPS_PORT:-443}:443/udp"
+
+  prometheus:
+    image: prom/prometheus:v3.11.3
+    cpus: "${PROMETHEUS_CPU_LIMIT:-0.50}"
+    mem_limit: "${PROMETHEUS_MEMORY_LIMIT:-512m}"
+    pids_limit: 100
+    command:
+      - "--config.file=/etc/prometheus/prometheus.yml"
+      - "--storage.tsdb.path=/prometheus"
+      - "--storage.tsdb.retention.time=${PROMETHEUS_RETENTION:-15d}"
+    volumes:
+      - ./monitoring/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - ./monitoring/alerts.yml:/etc/prometheus/alerts.yml:ro
+      - prometheus_data:/prometheus
+    depends_on:
+      auth-service:
+        condition: service_healthy
+      user-service:
+        condition: service_healthy
+      alertmanager:
+        condition: service_started
+    ports:
+      - "127.0.0.1:${PROMETHEUS_PORT:-9090}:9090"
+
+  alertmanager:
+    image: prom/alertmanager:v0.32.1
+    cpus: "${ALERTMANAGER_CPU_LIMIT:-0.25}"
+    mem_limit: "${ALERTMANAGER_MEMORY_LIMIT:-256m}"
+    pids_limit: 100
+    command:
+      - "--config.file=/etc/alertmanager/alertmanager.yml"
+      - "--storage.path=/alertmanager"
+      - "--enable-feature=utf8-strict-mode"
+    volumes:
+      - ./monitoring/alertmanager.yml:/etc/alertmanager/alertmanager.yml:ro
+      - alertmanager_data:/alertmanager
+    ports:
+      - "127.0.0.1:${ALERTMANAGER_PORT:-9093}:9093"
+
+  db-backup:
+    image: postgres:16-alpine
+    cpus: "${BACKUP_CPU_LIMIT:-0.25}"
+    mem_limit: "${BACKUP_MEMORY_LIMIT:-256m}"
+    pids_limit: 100
+    restart: unless-stopped
+    environment:
+      PGHOST: postgres-db
+      PGPORT: "5432"
+      PGUSER: ${POSTGRES_USER}
+      PGPASSWORD: ${POSTGRES_PASSWORD}
+      BACKUP_DATABASES: "${AUTH_DB:-auth_service} ${USER_DB:-user_service}"
+      BACKUP_DIRECTORY: /backups
+      BACKUP_INTERVAL_SECONDS: "${BACKUP_INTERVAL_SECONDS:-86400}"
+      BACKUP_RETENTION_DAYS: "${BACKUP_RETENTION_DAYS:-14}"
+    volumes:
+      - ./operations/postgres-backup.sh:/usr/local/bin/postgres-backup.sh:ro
+      - postgres_backups:/backups
+    entrypoint:
+      - /bin/sh
+      - /usr/local/bin/postgres-backup.sh
+    depends_on:
+      postgres-db:
+        condition: service_healthy
 volumes:
   postgres_data:
+  prometheus_data:
+  alertmanager_data:
+  postgres_backups:
+  caddy_data:
+  caddy_config:

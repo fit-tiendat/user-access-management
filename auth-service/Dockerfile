@@ -1,23 +1,32 @@
-# --------- build stage (tạo JAR) ---------
 FROM maven:3.9.9-eclipse-temurin-17 AS build
 WORKDIR /workspace
 
-# copy POM cha + module cần thiết trước để cache
 COPY pom.xml ./pom.xml
 COPY core/pom.xml ./core/pom.xml
 COPY auth-service/pom.xml ./auth-service/pom.xml
 COPY user-service/pom.xml ./user-service/pom.xml
-# copy source
+
 COPY core ./core
 COPY auth-service ./auth-service
 COPY user-service ./user-service
-# build riêng module auth-service (kéo theo core) và bỏ test
+
 RUN mvn -q -DskipTests -pl auth-service -am package
 
-# --------- runtime stage (chạy app) ---------
-FROM eclipse-temurin:17-jre
+FROM eclipse-temurin:17-jre-jammy
 WORKDIR /app
-# copy đúng file jar đã build từ stage trên
-COPY --from=build /workspace/auth-service/target/auth-service-*-SNAPSHOT.jar app.jar
+
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends curl \
+    && rm -rf /var/lib/apt/lists/* \
+    && groupadd --system app \
+    && useradd --system --gid app --home-dir /app --shell /usr/sbin/nologin app \
+    && chown app:app /app
+
+COPY --from=build --chown=app:app /workspace/auth-service/target/auth-service-*-SNAPSHOT.jar app.jar
+
+USER app
 EXPOSE 8081
-ENTRYPOINT ["java","-jar","/app/app.jar"]
+HEALTHCHECK --interval=30s --timeout=5s --start-period=30s --retries=3 \
+    CMD curl --fail --silent http://localhost:9081/actuator/health/readiness || exit 1
+
+ENTRYPOINT ["java", "-jar", "/app/app.jar"]
