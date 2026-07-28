@@ -34,7 +34,13 @@ public class SecurityConfig {
 
                 .authorizeHttpRequests(auth -> auth
                         // public
-                        .requestMatchers("/actuator/**", "/error").permitAll()
+                        .requestMatchers(
+                                "/actuator/health",
+                                "/actuator/health/**",
+                                "/actuator/info",
+                                "/actuator/prometheus",
+                                "/error"
+                        ).permitAll()
                         .requestMatchers("/v3/api-docs/**", "/swagger-ui/**", "/swagger-ui.html").permitAll()
 
                         // cho USER + ADMIN dùng /me
