@@ -1,0 +1,32 @@
+{$PUBLIC_DOMAIN:localhost} {
+	encode zstd gzip
+
+	log {
+		output stdout
+		format json
+	}
+
+	header {
+		-Server
+		Strict-Transport-Security "max-age=31536000; includeSubDomains; preload"
+	}
+
+	@auth path /api/v1/auth/*
+	handle @auth {
+		reverse_proxy auth-service:8081
+	}
+
+	@roles path /api/v1/role/*
+	handle @roles {
+		reverse_proxy auth-service:8081
+	}
+
+	@profiles path /api/v1/users/*
+	handle @profiles {
+		reverse_proxy user-service:8082
+	}
+
+	handle {
+		respond "Not Found" 404
+	}
+}
