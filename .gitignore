@@ -1,2 +1,41 @@
-META-INF/
+# Environment variables
 .env
+
+# Maven build artifacts
+target/
+*/target/
+!.mvn/wrapper/maven-wrapper.jar
+
+# IDE settings (personal configurations)
+.vscode/
+.idea/
+*.iml
+*.iws
+*.ipr
+.settings/
+.classpath
+.project
+
+# AI Assistant personal rules
+.agent/
+
+# OS specific files
+.DS_Store
+Thumbs.db
+*.swp
+*.swo
+*~
+
+# Binary documentation files (share via link instead)
+docs/
+
+# Log files and directories
+logs/
+*.log
+
+# Temporary files
+*.tmp
+*.bak
+
+# META-INF (already ignored)
+META-INF/

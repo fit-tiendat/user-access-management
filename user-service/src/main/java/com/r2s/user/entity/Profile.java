@@ -16,13 +16,13 @@ public class Profile {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
-    // map 1-1 theo username của auth-service
-    @Column(nullable = false, unique = true)
+    // Logical link to auth-service: JWT subject currently contains the username.
+    @Column(nullable = false, unique = true, length = 50)
     private String username;
 
+    @Column(name = "full_name", length = 100)
     private String fullName;
 
-    //  đồng bộ với DTO: không null, unique
-    @Column(nullable = false, unique = true)
+    @Column(nullable = false, unique = true, length = 100)
     private String email;
 }

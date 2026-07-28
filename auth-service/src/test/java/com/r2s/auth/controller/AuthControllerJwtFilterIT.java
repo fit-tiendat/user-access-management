@@ -37,7 +37,7 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
 
 @SpringBootTest
-@AutoConfigureMockMvc   // bật full filter chain
+@AutoConfigureMockMvc // bật full filter chain
 @ActiveProfiles("test")
 @Import(JwtFilter.class)
 @Testcontainers
@@ -46,25 +46,27 @@ class AuthControllerJwtFilterIT {
     private static final String BASE = "/api/v1/auth";
     private static final String DUMMY_TOKEN = "any.jwt.token";
 
-    @Autowired MockMvc mockMvc;
-    @Autowired ObjectMapper objectMapper;
+    @Autowired
+    MockMvc mockMvc;
+    @Autowired
+    ObjectMapper objectMapper;
 
-    @MockBean JwtService jwtService;
-    @MockBean UserDetailsService userDetailsService;
+    @MockBean
+    JwtService jwtService;
+    @MockBean
+    UserDetailsService userDetailsService;
 
     @MockBean
     RegistrationService registrationService;
     @MockBean
     AuthenticationService authenticationService;
 
-
     // ====== Testcontainers Postgres cho profile test ======
     @Container
-    static PostgreSQLContainer<?> postgres =
-            new PostgreSQLContainer<>("postgres:16-alpine")
-                    .withDatabaseName("user_access_management")
-                    .withUsername("postgres")
-                    .withPassword("d433221dat");
+    static PostgreSQLContainer<?> postgres = new PostgreSQLContainer<>("postgres:13-alpine")
+            .withDatabaseName("user_access_management")
+            .withUsername("postgres")
+            .withPassword("d433221dat");
 
     @DynamicPropertySource
     static void overrideProps(DynamicPropertyRegistry registry) {
@@ -92,8 +94,8 @@ class AuthControllerJwtFilterIT {
         req.setRole(Role.ROLE_USER);
 
         mockMvc.perform(post(BASE + "/register")
-                        .contentType(APPLICATION_JSON)
-                        .content(objectMapper.writeValueAsString(req)))
+                .contentType(APPLICATION_JSON)
+                .content(objectMapper.writeValueAsString(req)))
                 .andExpect(status().isOk())
                 .andExpect(content().string("User registered successfully"));
 
@@ -111,8 +113,8 @@ class AuthControllerJwtFilterIT {
                 """;
 
         mockMvc.perform(post(BASE + "/register")
-                        .contentType(APPLICATION_JSON)
-                        .content(json))
+                .contentType(APPLICATION_JSON)
+                .content(json))
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.username").exists());
 
@@ -130,8 +132,8 @@ class AuthControllerJwtFilterIT {
         given(authenticationService.login(any(LoginRequest.class))).willReturn(resp);
 
         mockMvc.perform(post(BASE + "/login")
-                        .contentType(APPLICATION_JSON)
-                        .content(objectMapper.writeValueAsString(req)))
+                .contentType(APPLICATION_JSON)
+                .content(objectMapper.writeValueAsString(req)))
                 .andExpect(status().isOk())
                 .andExpect(content().contentType(APPLICATION_JSON))
                 .andExpect(jsonPath("$.token").value("jwt.token.here"));
@@ -150,8 +152,8 @@ class AuthControllerJwtFilterIT {
                 .willThrow(new BadCredentialsException("Invalid username or password"));
 
         mockMvc.perform(post(BASE + "/login")
-                        .contentType(APPLICATION_JSON)
-                        .content(objectMapper.writeValueAsString(req)))
+                .contentType(APPLICATION_JSON)
+                .content(objectMapper.writeValueAsString(req)))
                 .andExpect(status().isUnauthorized())
                 .andExpect(content().string(containsString("Invalid username or password")));
     }
@@ -174,7 +176,7 @@ class AuthControllerJwtFilterIT {
         String authHeader = bearerFor("alice", "ROLE_USER");
 
         mockMvc.perform(get(BASE + "/admin-only")
-                        .header("Authorization", authHeader))
+                .header("Authorization", authHeader))
                 .andExpect(status().isForbidden());
     }
 
@@ -184,7 +186,7 @@ class AuthControllerJwtFilterIT {
         String authHeader = bearerFor("admin", "ROLE_ADMIN");
 
         mockMvc.perform(get(BASE + "/admin-only")
-                        .header("Authorization", authHeader))
+                .header("Authorization", authHeader))
                 .andExpect(status().isOk())
                 .andExpect(content().string("ADMIN area"));
     }
@@ -196,7 +198,7 @@ class AuthControllerJwtFilterIT {
         given(jwtService.isSignatureAndExpiryValid(badToken)).willReturn(false);
 
         mockMvc.perform(get(BASE + "/admin-only")
-                        .header("Authorization", "Bearer " + badToken))
+                .header("Authorization", "Bearer " + badToken))
                 .andExpect(status().isUnauthorized());
     }
 }

@@ -25,70 +25,65 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 @Transactional
 class AuthServiceImplIT {
 
-    @Container
-    static PostgreSQLContainer<?> postgres =
-            new PostgreSQLContainer<>("postgres:16-alpine")
-                    .withDatabaseName("user_access_management")
-                    .withUsername("postgres")
-                    .withPassword("d433221dat");
+        @Container
+        static PostgreSQLContainer<?> postgres = new PostgreSQLContainer<>("postgres:13-alpine")
+                        .withDatabaseName("user_access_management")
+                        .withUsername("postgres")
+                        .withPassword("d433221dat");
 
-    @DynamicPropertySource
-    static void overrideProps(DynamicPropertyRegistry registry) {
-        registry.add("spring.datasource.url", postgres::getJdbcUrl);
-        registry.add("spring.datasource.username", postgres::getUsername);
-        registry.add("spring.datasource.password", postgres::getPassword);
-    }
+        @DynamicPropertySource
+        static void overrideProps(DynamicPropertyRegistry registry) {
+                registry.add("spring.datasource.url", postgres::getJdbcUrl);
+                registry.add("spring.datasource.username", postgres::getUsername);
+                registry.add("spring.datasource.password", postgres::getPassword);
+        }
 
-    @Autowired
-    AuthenticationService authService;
-    @Autowired
-    RegistrationService registrationService;
+        @Autowired
+        AuthenticationService authService;
+        @Autowired
+        RegistrationService registrationService;
 
-    @Test
-    @DisplayName("register: đăng ký user mới -> login lại được, trả JWT")
-    void register_then_login_success() {
-        // given
-        RegisterRequest registerReq = new RegisterRequest(
-                "alice_auth",   // username
-                "@P4ssw0rd",    // password
-                null            // role (cho null, service tự handle)
-        );
+        @Test
+        @DisplayName("register: đăng ký user mới -> login lại được, trả JWT")
+        void register_then_login_success() {
+                // given
+                RegisterRequest registerReq = new RegisterRequest(
+                                "alice_auth", // username
+                                "@P4ssw0rd", // password
+                                null // role (cho null, service tự handle)
+                );
 
-        // when: chỉ cần gọi register, không cần giá trị trả về
-        registrationService.register(registerReq);
+                // when: chỉ cần gọi register, không cần giá trị trả về
+                registrationService.register(registerReq);
 
-        // then: login lại phải thành công và trả token
-        LoginRequest loginReq = new LoginRequest(
-                "alice_auth",
-                "@P4ssw0rd"
-        );
+                // then: login lại phải thành công và trả token
+                LoginRequest loginReq = new LoginRequest(
+                                "alice_auth",
+                                "@P4ssw0rd");
 
-        AuthResponse loginRes = authService.login(loginReq);
+                AuthResponse loginRes = authService.login(loginReq);
 
-        assertThat(loginRes).isNotNull();
-        assertThat(loginRes.getToken()).isNotBlank();
-    }
+                assertThat(loginRes).isNotNull();
+                assertThat(loginRes.getToken()).isNotBlank();
+        }
 
-    @Test
-    @DisplayName("login: sai password -> BadCredentialsException")
-    void login_wrong_password() {
-        // given: tạo trước 1 user hợp lệ
-        RegisterRequest registerReq = new RegisterRequest(
-                "bob_auth",
-                "@P4ssw0rd",
-                null
-        );
-        registrationService.register(registerReq);
+        @Test
+        @DisplayName("login: sai password -> BadCredentialsException")
+        void login_wrong_password() {
+                // given: tạo trước 1 user hợp lệ
+                RegisterRequest registerReq = new RegisterRequest(
+                                "bob_auth",
+                                "@P4ssw0rd",
+                                null);
+                registrationService.register(registerReq);
 
-        // when + then: login sai password -> ném BadCredentialsException
-        LoginRequest loginReq = new LoginRequest(
-                "bob_auth",
-                "wrong-password"
-        );
+                // when + then: login sai password -> ném BadCredentialsException
+                LoginRequest loginReq = new LoginRequest(
+                                "bob_auth",
+                                "wrong-password");
 
-        assertThrows(
-                BadCredentialsException.class,
-                () -> authService.login(loginReq)
-        );
-    }
+                assertThrows(
+                                BadCredentialsException.class,
+                                () -> authService.login(loginReq));
+        }
 }

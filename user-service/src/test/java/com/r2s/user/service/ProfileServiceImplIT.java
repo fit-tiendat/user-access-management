@@ -26,11 +26,10 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 class ProfileServiceImplIT {
 
     @Container
-    static PostgreSQLContainer<?> postgres =
-            new PostgreSQLContainer<>("postgres:16-alpine")
-                    .withDatabaseName("user_access_management")
-                    .withUsername("postgres")
-                    .withPassword("d433221dat");
+    static PostgreSQLContainer<?> postgres = new PostgreSQLContainer<>("postgres:13-alpine")
+            .withDatabaseName("user_access_management")
+            .withUsername("postgres")
+            .withPassword("d433221dat");
 
     @DynamicPropertySource
     static void overrideProps(DynamicPropertyRegistry registry) {
@@ -39,8 +38,10 @@ class ProfileServiceImplIT {
         registry.add("spring.datasource.password", postgres::getPassword);
     }
 
-    @Autowired ProfileService profileService;
-    @Autowired ProfileRepository profileRepository;
+    @Autowired
+    ProfileService profileService;
+    @Autowired
+    ProfileRepository profileRepository;
 
     @Test
     @DisplayName("upsert: chưa có profile -> tạo mới")
@@ -49,8 +50,7 @@ class ProfileServiceImplIT {
         String username = "alice_it";
         ProfileDto dto = new ProfileDto(
                 "Alice Integration",
-                "alice.it@mail.com"
-        );
+                "alice.it@mail.com");
 
         // when
         Profile saved = profileService.upsert(username, dto);
@@ -81,8 +81,7 @@ class ProfileServiceImplIT {
 
         ProfileDto dto = new ProfileDto(
                 "Bob New",
-                "new@mail.com"
-        );
+                "new@mail.com");
 
         // when
         Profile updated = profileService.upsert(username, dto);
