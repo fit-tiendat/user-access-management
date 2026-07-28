@@ -1,6 +1,7 @@
 package com.r2s.user.controller;
 
 import com.r2s.core.dto.ApiResponse;
+import com.r2s.core.dto.PageResponse;
 import com.r2s.core.utils.ResponseBuilder;
 import com.r2s.core.utils.ValidationPatterns;
 import com.r2s.user.dto.ProfileDto;
@@ -9,9 +10,14 @@ import com.r2s.user.entity.Profile;
 import com.r2s.user.service.ProfileCommandService;
 import com.r2s.user.service.ProfileQueryService;
 import jakarta.validation.Valid;
+import jakarta.validation.constraints.Max;
+import jakarta.validation.constraints.Min;
 import jakarta.validation.constraints.Pattern;
 import jakarta.validation.constraints.Size;
 import lombok.RequiredArgsConstructor;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Sort;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
@@ -19,8 +25,6 @@ import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.*;
 
 import java.security.Principal;
-import java.util.List;
-
 @Validated
 @RestController
 @RequestMapping("${api.base-path:/api/v1}/users")
@@ -68,13 +72,16 @@ public class ProfileController {
 
     @GetMapping
     @PreAuthorize("hasRole('ADMIN')")
-    public ResponseEntity<ApiResponse<List<ProfileResponse>>> all() {
-        List<ProfileResponse> result = queryService.getAll()
-                .stream()
-                .map(this::toResponse)
-                .toList();
+    public ResponseEntity<ApiResponse<PageResponse<ProfileResponse>>> all(
+            @RequestParam(name = "page", defaultValue = "0") @Min(0) int page,
+            @RequestParam(name = "size", defaultValue = "20") @Min(1) @Max(100) int size
+    ) {
+        Page<ProfileResponse> result = queryService.getAll(
+                        PageRequest.of(page, size, Sort.by("username").ascending())
+                )
+                .map(this::toResponse);
 
-        return responseBuilder.ok(result, "Profiles retrieved successfully");
+        return responseBuilder.ok(PageResponse.from(result), "Profiles retrieved successfully");
     }
 
     @DeleteMapping("/{username}")

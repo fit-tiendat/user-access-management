@@ -5,10 +5,10 @@ import com.r2s.user.dto.ProfileDto;
 import com.r2s.user.entity.Profile;
 import com.r2s.user.repository.ProfileRepository;
 import lombok.RequiredArgsConstructor;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-
-import java.util.List;
 
 @Service
 @RequiredArgsConstructor
@@ -35,8 +35,8 @@ public class ProfileServiceImpl implements ProfileService {
     }
 
     @Override
-    public List<Profile> getAll() {
-        return repo.findAll();
+    public Page<Profile> getAll(Pageable pageable) {
+        return repo.findAll(pageable);
     }
 
     @Override

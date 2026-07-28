@@ -9,8 +9,9 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.data.domain.PageImpl;
+import org.springframework.data.domain.PageRequest;
 
-import java.util.List;
 import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -85,10 +86,12 @@ class ProfileServiceImplTest {
 
     @Test
     void getAll_shouldReturnAllProfiles() {
-        when(repo.findAll()).thenReturn(List.of(new Profile(), new Profile()));
+        var pageable = PageRequest.of(0, 20);
+        when(repo.findAll(pageable))
+                .thenReturn(new PageImpl<>(java.util.List.of(new Profile(), new Profile())));
 
-        assertThat(service.getAll()).hasSize(2);
-        verify(repo).findAll();
+        assertThat(service.getAll(pageable).getContent()).hasSize(2);
+        verify(repo).findAll(pageable);
     }
 
     @Test

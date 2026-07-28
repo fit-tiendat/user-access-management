@@ -3,6 +3,7 @@ package com.r2s.core.exception;
 import com.r2s.core.dto.ApiErrorCode;
 import com.r2s.core.dto.ApiResponse;
 import jakarta.servlet.http.HttpServletRequest;
+import jakarta.validation.ConstraintViolationException;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -54,6 +55,17 @@ public class GlobalExceptionHandler {
                         ApiErrorCode.VALIDATION_ERROR.name(),
                         "Request validation failed",
                         fieldErrors
+                ));
+    }
+
+    @ExceptionHandler(ConstraintViolationException.class)
+    public ResponseEntity<ApiResponse<Object>> handleConstraintViolation(
+            ConstraintViolationException ex
+    ) {
+        return ResponseEntity.status(HttpStatus.BAD_REQUEST)
+                .body(ApiResponse.failed(
+                        ApiErrorCode.VALIDATION_ERROR.name(),
+                        "Request validation failed"
                 ));
     }
 
