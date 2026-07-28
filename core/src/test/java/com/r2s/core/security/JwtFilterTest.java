@@ -38,15 +38,17 @@ class JwtFilterTest {
     }
 
     @Test
-    void shouldBypassFilter_forPublicPaths() throws ServletException, IOException {
+    void shouldValidatePresentedToken_regardlessOfRequestPath() throws ServletException, IOException {
         MockHttpServletRequest request = new MockHttpServletRequest();
-        request.setServletPath("/api/v1/auth/login"); // path public
+        request.setServletPath("/api/v1/auth/login");
+        request.addHeader(HttpHeaders.AUTHORIZATION, "Bearer bad.token");
         MockHttpServletResponse response = new MockHttpServletResponse();
+        given(jwtService.isSignatureAndExpiryValid("bad.token")).willReturn(false);
 
         jwtFilter.doFilterInternal(request, response, filterChain);
 
-        verify(filterChain, times(1)).doFilter(request, response);
-        verifyNoInteractions(jwtService);
+        verifyNoInteractions(filterChain);
+        assertThat(response.getStatus()).isEqualTo(401);
         assertThat(SecurityContextHolder.getContext().getAuthentication()).isNull();
     }
 

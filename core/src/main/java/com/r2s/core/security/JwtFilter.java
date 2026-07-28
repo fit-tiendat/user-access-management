@@ -20,6 +20,8 @@ import java.util.List;
 @Component
 public class JwtFilter extends OncePerRequestFilter {
 
+    private static final String BEARER_PREFIX = "Bearer ";
+
     private final JwtService jwtService;
 
     public JwtFilter(JwtService jwtService) {
@@ -32,80 +34,54 @@ public class JwtFilter extends OncePerRequestFilter {
                                     FilterChain filterChain)
             throws ServletException, IOException {
 
-        String path = request.getServletPath();
-
-        // 1) Bỏ qua hoàn toàn cho các endpoint public: login/register, swagger, actuator...
-        boolean isPublicAuthEndpoint =
-                path.equals("/api/v1/auth/register") ||
-                        path.equals("/api/v1/auth/login")    ||
-                        path.equals("/auth/register")        ||
-                        path.equals("/auth/login");
-
-        if (isPublicAuthEndpoint
-                || path.startsWith("/actuator")
-                || path.startsWith("/error")
-                || path.startsWith("/v3/api-docs")
-                || path.startsWith("/swagger-ui")) {
-
-            filterChain.doFilter(request, response);
-            return;
-        }
-
-        // 2) Lấy header Authorization. Nếu không có / sai format -> KHÔNG tự 401,
-        // cứ cho đi tiếp để Spring Security tự xử lý (endpoint yêu cầu auth sẽ 401).
+        // URL authorization belongs to each service's SecurityConfig. This filter
+        // only handles requests that actually present a Bearer token.
         String authHeader = request.getHeader(HttpHeaders.AUTHORIZATION);
-        if (authHeader == null || !authHeader.startsWith("Bearer ")) {
+        if (authHeader == null || !authHeader.startsWith(BEARER_PREFIX)) {
             filterChain.doFilter(request, response);
             return;
         }
 
-        String token = authHeader.substring(7);
+        String token = authHeader.substring(BEARER_PREFIX.length());
 
         try {
-            // 3) Check chữ ký + expiry của JWT
             if (!jwtService.isSignatureAndExpiryValid(token)) {
                 response.sendError(HttpServletResponse.SC_UNAUTHORIZED, "Invalid JWT");
                 return;
             }
 
-            // 4) Lấy thông tin từ token
             String username = jwtService.extractUsername(token);
             String roleClaim = jwtService.extractRole(token);
 
-            // Nếu chưa có Authentication trong SecurityContext thì set vào
             if (username != null
                     && SecurityContextHolder.getContext().getAuthentication() == null) {
-
-                String authorityName = null;
-                if (roleClaim != null) {
-                    authorityName = roleClaim.startsWith("ROLE_")
-                            ? roleClaim
-                            : "ROLE_" + roleClaim;
-                }
-
-                List<GrantedAuthority> authorities =
-                        authorityName == null
-                                ? Collections.emptyList()
-                                : List.of(new SimpleGrantedAuthority(authorityName));
-
-                var authToken = new UsernamePasswordAuthenticationToken(
+                List<GrantedAuthority> authorities = authoritiesFrom(roleClaim);
+                var authentication = new UsernamePasswordAuthenticationToken(
                         username,
                         null,
                         authorities
                 );
-                authToken.setDetails(
+                authentication.setDetails(
                         new WebAuthenticationDetailsSource().buildDetails(request)
                 );
-                SecurityContextHolder.getContext().setAuthentication(authToken);
+                SecurityContextHolder.getContext().setAuthentication(authentication);
             }
-
-        } catch (RuntimeException ex) {
-            // Bất kỳ lỗi parse/validate JWT nào -> 401
+        } catch (RuntimeException failure) {
             response.sendError(HttpServletResponse.SC_UNAUTHORIZED, "Invalid JWT");
             return;
         }
 
-        // 5) Cho request đi tiếp
         filterChain.doFilter(request, response);
+    }
+
+    private List<GrantedAuthority> authoritiesFrom(String roleClaim) {
+        if (roleClaim == null) {
+            return Collections.emptyList();
+        }
+
+        String authority = roleClaim.startsWith("ROLE_")
+                ? roleClaim
+                : "ROLE_" + roleClaim;
+        return List.of(new SimpleGrantedAuthority(authority));
     }
 }
