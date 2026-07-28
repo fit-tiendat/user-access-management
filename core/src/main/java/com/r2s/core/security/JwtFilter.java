@@ -14,7 +14,6 @@ import org.springframework.stereotype.Component;
 import org.springframework.web.filter.OncePerRequestFilter;
 
 import java.io.IOException;
-import java.util.Collections;
 import java.util.List;
 
 @Component
@@ -50,22 +49,18 @@ public class JwtFilter extends OncePerRequestFilter {
                 return;
             }
 
-            String username = jwtService.extractUsername(token);
-            String roleClaim = jwtService.extractRole(token);
-
-            if (username != null
-                    && SecurityContextHolder.getContext().getAuthentication() == null) {
-                List<GrantedAuthority> authorities = authoritiesFrom(roleClaim);
-                var authentication = new UsernamePasswordAuthenticationToken(
-                        username,
-                        null,
-                        authorities
-                );
-                authentication.setDetails(
-                        new WebAuthenticationDetailsSource().buildDetails(request)
-                );
-                SecurityContextHolder.getContext().setAuthentication(authentication);
-            }
+            String username = requireClaim(jwtService.extractUsername(token));
+            String roleClaim = requireClaim(jwtService.extractRole(token));
+            List<GrantedAuthority> authorities = authoritiesFrom(roleClaim);
+            var authentication = new UsernamePasswordAuthenticationToken(
+                    username,
+                    null,
+                    authorities
+            );
+            authentication.setDetails(
+                    new WebAuthenticationDetailsSource().buildDetails(request)
+            );
+            SecurityContextHolder.getContext().setAuthentication(authentication);
         } catch (RuntimeException failure) {
             response.sendError(HttpServletResponse.SC_UNAUTHORIZED, "Invalid JWT");
             return;
@@ -74,11 +69,14 @@ public class JwtFilter extends OncePerRequestFilter {
         filterChain.doFilter(request, response);
     }
 
-    private List<GrantedAuthority> authoritiesFrom(String roleClaim) {
-        if (roleClaim == null) {
-            return Collections.emptyList();
+    private String requireClaim(String claim) {
+        if (claim == null || claim.isBlank()) {
+            throw new IllegalArgumentException("Required JWT claim is missing");
         }
+        return claim;
+    }
 
+    private List<GrantedAuthority> authoritiesFrom(String roleClaim) {
         String authority = roleClaim.startsWith("ROLE_")
                 ? roleClaim
                 : "ROLE_" + roleClaim;
