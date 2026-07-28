@@ -6,7 +6,6 @@ import com.r2s.auth.dto.LoginRequest;
 import com.r2s.auth.dto.RegisterRequest;
 import com.r2s.auth.service.AuthenticationService;
 import com.r2s.auth.service.RegistrationService;
-import com.r2s.core.entity.Role;
 import com.r2s.core.security.JwtFilter;
 import com.r2s.core.security.JwtService;
 import org.junit.jupiter.api.DisplayName;
@@ -27,7 +26,6 @@ import org.testcontainers.containers.PostgreSQLContainer;
 import org.testcontainers.junit.jupiter.Container;
 import org.testcontainers.junit.jupiter.Testcontainers;
 
-import static org.hamcrest.Matchers.containsString;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.BDDMockito.given;
 import static org.mockito.Mockito.verify;
@@ -66,7 +64,7 @@ class AuthControllerJwtFilterIT {
     static PostgreSQLContainer<?> postgres = new PostgreSQLContainer<>("postgres:13-alpine")
             .withDatabaseName("user_access_management")
             .withUsername("postgres")
-            .withPassword("d433221dat");
+            .withPassword("integration-test-only");
 
     @DynamicPropertySource
     static void overrideProps(DynamicPropertyRegistry registry) {
@@ -90,8 +88,7 @@ class AuthControllerJwtFilterIT {
     void register_should200_when_valid() throws Exception {
         RegisterRequest req = new RegisterRequest();
         req.setUsername("alice1");
-        req.setPassword("secret123");
-        req.setRole(Role.ROLE_USER);
+        req.setPassword("Strong@123");
 
         mockMvc.perform(post(BASE + "/register")
                 .contentType(APPLICATION_JSON)
@@ -108,7 +105,7 @@ class AuthControllerJwtFilterIT {
         String json = """
                 {
                   "username": "abc",
-                  "password": "123456"
+                  "password": "Strong@123"
                 }
                 """;
 
@@ -116,7 +113,8 @@ class AuthControllerJwtFilterIT {
                 .contentType(APPLICATION_JSON)
                 .content(json))
                 .andExpect(status().isBadRequest())
-                .andExpect(jsonPath("$.username").exists());
+                .andExpect(jsonPath("$.errorCode").value("VALIDATION_ERROR"))
+                .andExpect(jsonPath("$.data.username").exists());
 
         verifyNoInteractions(registrationService);
     }
@@ -155,7 +153,8 @@ class AuthControllerJwtFilterIT {
                 .contentType(APPLICATION_JSON)
                 .content(objectMapper.writeValueAsString(req)))
                 .andExpect(status().isUnauthorized())
-                .andExpect(content().string(containsString("Invalid username or password")));
+                .andExpect(jsonPath("$.errorCode").value("UNAUTHORIZED"))
+                .andExpect(jsonPath("$.message").value("Invalid username or password"));
     }
 
     // ===== test BỔ SUNG cho admin-only / quyền =====

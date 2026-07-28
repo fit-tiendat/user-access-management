@@ -38,15 +38,17 @@ class JwtFilterTest {
     }
 
     @Test
-    void shouldBypassFilter_forPublicPaths() throws ServletException, IOException {
+    void shouldValidatePresentedToken_regardlessOfRequestPath() throws ServletException, IOException {
         MockHttpServletRequest request = new MockHttpServletRequest();
-        request.setServletPath("/api/v1/auth/login"); // path public
+        request.setServletPath("/api/v1/auth/login");
+        request.addHeader(HttpHeaders.AUTHORIZATION, "Bearer bad.token");
         MockHttpServletResponse response = new MockHttpServletResponse();
+        given(jwtService.isSignatureAndExpiryValid("bad.token")).willReturn(false);
 
         jwtFilter.doFilterInternal(request, response, filterChain);
 
-        verify(filterChain, times(1)).doFilter(request, response);
-        verifyNoInteractions(jwtService);
+        verifyNoInteractions(filterChain);
+        assertThat(response.getStatus()).isEqualTo(401);
         assertThat(SecurityContextHolder.getContext().getAuthentication()).isNull();
     }
 
@@ -114,5 +116,59 @@ class JwtFilterTest {
 
         verifyNoInteractions(filterChain);
         assertThat(response.getStatus()).isEqualTo(401);
+    }
+
+    @Test
+    void shouldReturn401_whenSubjectClaimMissing() throws ServletException, IOException {
+        MockHttpServletRequest request = requestWithBearerToken("missing-subject.token");
+        MockHttpServletResponse response = new MockHttpServletResponse();
+
+        given(jwtService.isSignatureAndExpiryValid("missing-subject.token")).willReturn(true);
+        given(jwtService.extractUsername("missing-subject.token")).willReturn(null);
+
+        jwtFilter.doFilterInternal(request, response, filterChain);
+
+        verifyNoInteractions(filterChain);
+        assertThat(response.getStatus()).isEqualTo(401);
+        assertThat(SecurityContextHolder.getContext().getAuthentication()).isNull();
+    }
+
+    @Test
+    void shouldReturn401_whenRoleClaimMissing() throws ServletException, IOException {
+        MockHttpServletRequest request = requestWithBearerToken("missing-role.token");
+        MockHttpServletResponse response = new MockHttpServletResponse();
+
+        given(jwtService.isSignatureAndExpiryValid("missing-role.token")).willReturn(true);
+        given(jwtService.extractUsername("missing-role.token")).willReturn("alice");
+        given(jwtService.extractRole("missing-role.token")).willReturn(null);
+
+        jwtFilter.doFilterInternal(request, response, filterChain);
+
+        verifyNoInteractions(filterChain);
+        assertThat(response.getStatus()).isEqualTo(401);
+        assertThat(SecurityContextHolder.getContext().getAuthentication()).isNull();
+    }
+
+    @Test
+    void shouldReturn401_whenRoleClaimIsNotWhitelisted() throws ServletException, IOException {
+        MockHttpServletRequest request = requestWithBearerToken("unknown-role.token");
+        MockHttpServletResponse response = new MockHttpServletResponse();
+
+        given(jwtService.isSignatureAndExpiryValid("unknown-role.token")).willReturn(true);
+        given(jwtService.extractUsername("unknown-role.token")).willReturn("alice");
+        given(jwtService.extractRole("unknown-role.token")).willReturn("ROLE_SUPER_ADMIN");
+
+        jwtFilter.doFilterInternal(request, response, filterChain);
+
+        verifyNoInteractions(filterChain);
+        assertThat(response.getStatus()).isEqualTo(401);
+        assertThat(SecurityContextHolder.getContext().getAuthentication()).isNull();
+    }
+
+    private MockHttpServletRequest requestWithBearerToken(String token) {
+        MockHttpServletRequest request = new MockHttpServletRequest();
+        request.setServletPath("/api/v1/users/me");
+        request.addHeader(HttpHeaders.AUTHORIZATION, "Bearer " + token);
+        return request;
     }
 }

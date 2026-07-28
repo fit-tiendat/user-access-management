@@ -5,16 +5,16 @@ import com.r2s.auth.security.JwtClaimsBuilder;
 import com.r2s.core.dto.AuthResponse;
 import com.r2s.core.entity.User;
 import com.r2s.core.repository.UserRepository;
+import com.r2s.core.security.audit.SecurityAuditLogger;
 import com.r2s.core.security.JwtService;
 import lombok.RequiredArgsConstructor;
-import lombok.extern.slf4j.Slf4j;
 import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.authentication.BadCredentialsException;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
+import org.springframework.security.core.AuthenticationException;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
 
-@Slf4j
 @Component
 @RequiredArgsConstructor
 public class PasswordAuthenticationStrategy implements AuthenticationStrategy {
@@ -23,6 +23,7 @@ public class PasswordAuthenticationStrategy implements AuthenticationStrategy {
     private final UserRepository userRepository;
     private final JwtService jwtService;
     private final JwtClaimsBuilder claimsBuilder;
+    private final SecurityAuditLogger securityAuditLogger;
 
     @Override
     public boolean supports(String authType) {
@@ -47,13 +48,12 @@ public class PasswordAuthenticationStrategy implements AuthenticationStrategy {
                     claimsBuilder.buildClaims(user)
             );
 
-            // Không log token/password
-            log.info("Login success: username={}, role={}", user.getUsername(), user.getRole());
+            securityAuditLogger.loginSucceeded(user.getUsername(), user.getRole());
 
             return new AuthResponse(token);
 
-        } catch (BadCredentialsException ex) {
-            log.warn("Login failed: username={}", username);
+        } catch (AuthenticationException ex) {
+            securityAuditLogger.loginFailed(username);
             throw ex;
         }
     }

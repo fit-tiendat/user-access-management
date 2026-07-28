@@ -5,6 +5,7 @@ import com.r2s.core.entity.Role;
 import com.r2s.core.entity.User;
 import com.r2s.core.exception.ConflictException;
 import com.r2s.core.repository.UserRepository;
+import com.r2s.core.security.audit.SecurityAuditLogger;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
@@ -27,6 +28,9 @@ class RegistrationServiceImplTest {
     @Mock
     PasswordEncoder passwordEncoder;
 
+    @Mock
+    SecurityAuditLogger securityAuditLogger;
+
     @InjectMocks
     RegistrationServiceImpl registrationService;
 
@@ -36,7 +40,6 @@ class RegistrationServiceImplTest {
         RegisterRequest req = new RegisterRequest();
         req.setUsername("john");
         req.setPassword("1234");
-        req.setRole(null); // default ROLE_USER
 
         when(userRepository.existsByUsername("john")).thenReturn(false);
         when(passwordEncoder.encode("1234")).thenReturn("ENCODED");

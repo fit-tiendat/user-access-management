@@ -2,11 +2,11 @@ package com.r2s.auth.controller;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.r2s.core.dto.AuthResponse;
-import com.r2s.auth.exception.ApiExceptionHandler;
+import com.r2s.core.exception.ConflictException;
+import com.r2s.core.exception.GlobalExceptionHandler;
 import com.r2s.auth.service.AuthenticationService;
 import com.r2s.auth.service.RegistrationService;
 import org.junit.jupiter.api.Test;
-import org.mockito.Mock;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
 import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
@@ -16,7 +16,10 @@ import org.springframework.security.authentication.BadCredentialsException;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.web.servlet.MockMvc;
 
+import static org.hamcrest.Matchers.containsString;
+import static org.hamcrest.Matchers.not;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.when;
 import static org.springframework.http.MediaType.APPLICATION_JSON;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
@@ -24,7 +27,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 @WebMvcTest(controllers = AuthController.class)
 @AutoConfigureMockMvc(addFilters = false)
-@Import(ApiExceptionHandler.class)
+@Import(GlobalExceptionHandler.class)
 @ActiveProfiles("test")
 class AuthControllerWebMvcTest {
 
@@ -43,7 +46,7 @@ class AuthControllerWebMvcTest {
     void register_shouldReturn200_andSuccessMessage() throws Exception {
         // build JSON trực tiếp để khỏi cần constructor DTO
         String body = """
-                  {"username":"john","password":"secret123"}
+                  {"username":"john","password":"Strong@123"}
                 """;
 
         mockMvc.perform(post("/api/v1/auth/register")
@@ -74,13 +77,27 @@ class AuthControllerWebMvcTest {
     @Test
     void register_should400_whenUsernameHasWhitespace() throws Exception {
         String body = """
-                  {"username":"john doe","password":"secret123"}
+                  {"username":"john doe","password":"Strong@123"}
                 """;
 
         mockMvc.perform(post("/api/v1/auth/register")
                         .contentType(APPLICATION_JSON)
                         .content(body))
                 .andExpect(status().isBadRequest());
+    }
+
+    @Test
+    void register_should400_whenPasswordDoesNotMeetPolicy() throws Exception {
+        String body = """
+                  {"username":"john","password":"password123"}
+                """;
+
+        mockMvc.perform(post("/api/v1/auth/register")
+                        .contentType(APPLICATION_JSON)
+                        .content(body))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.errorCode").value("VALIDATION_ERROR"))
+                .andExpect(jsonPath("$.data.password").exists());
     }
 
     @Test
@@ -101,14 +118,44 @@ class AuthControllerWebMvcTest {
     @Test
     void register_should400_whenUsernameHasWhitespace_andReturnErrorMap() throws Exception {
         String body = """
-                  {"username":"john doe","password":"secret123"}
+                  {"username":"john doe","password":"Strong@123"}
                 """;
 
         mockMvc.perform(post("/api/v1/auth/register")
                         .contentType(APPLICATION_JSON)
                         .content(body))
                 .andExpect(status().isBadRequest())
-                .andExpect(jsonPath("$.username").exists());   // trả map field -> message
+                .andExpect(jsonPath("$.status").value("FAILED"))
+                .andExpect(jsonPath("$.errorCode").value("VALIDATION_ERROR"))
+                .andExpect(jsonPath("$.data.username").exists());
+    }
+
+    @Test
+    void register_should400_whenUsernameContainsMarkup() throws Exception {
+        String body = """
+                  {"username":"<script>","password":"Strong@123"}
+                """;
+
+        mockMvc.perform(post("/api/v1/auth/register")
+                        .contentType(APPLICATION_JSON)
+                        .content(body))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.errorCode").value("VALIDATION_ERROR"))
+                .andExpect(jsonPath("$.data.username").exists());
+    }
+
+    @Test
+    void login_should400_whenUsernameContainsControlCharacters() throws Exception {
+        String body = """
+                  {"username":"john\\nadmin","password":"Strong@123"}
+                """;
+
+        mockMvc.perform(post("/api/v1/auth/login")
+                        .contentType(APPLICATION_JSON)
+                        .content(body))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.errorCode").value("VALIDATION_ERROR"))
+                .andExpect(jsonPath("$.data.username").exists());
     }
 
     @Test
@@ -124,8 +171,46 @@ class AuthControllerWebMvcTest {
                         .contentType(APPLICATION_JSON)
                         .content(body))
                 .andExpect(status().isUnauthorized())
-                .andExpect(content().string("Invalid username or password"));
+                .andExpect(jsonPath("$.status").value("FAILED"))
+                .andExpect(jsonPath("$.errorCode").value("UNAUTHORIZED"))
+                .andExpect(jsonPath("$.message").value("Invalid username or password"));
     }
 
+    @Test
+    void register_should409_andUseStandardResponse_whenUsernameExists() throws Exception {
+        doThrow(new ConflictException("Username already exists"))
+                .when(register).register(any());
+
+        String body = """
+                  {"username":"john","password":"Strong@123"}
+                """;
+
+        mockMvc.perform(post("/api/v1/auth/register")
+                        .contentType(APPLICATION_JSON)
+                        .content(body))
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.status").value("FAILED"))
+                .andExpect(jsonPath("$.errorCode").value("CONFLICT"))
+                .andExpect(jsonPath("$.message").value("Username already exists"));
+    }
+
+    @Test
+    void login_should500_withoutLeakingInternalExceptionMessage() throws Exception {
+        when(authService.login(any()))
+                .thenThrow(new RuntimeException("database-password=do-not-leak"));
+
+        String body = """
+                  {"username":"john","password":"secret123"}
+                """;
+
+        mockMvc.perform(post("/api/v1/auth/login")
+                        .contentType(APPLICATION_JSON)
+                        .content(body))
+                .andExpect(status().isInternalServerError())
+                .andExpect(jsonPath("$.status").value("FAILED"))
+                .andExpect(jsonPath("$.errorCode").value("INTERNAL_ERROR"))
+                .andExpect(jsonPath("$.message").value("An unexpected error occurred"))
+                .andExpect(content().string(not(containsString("database-password"))));
+    }
 
 }
