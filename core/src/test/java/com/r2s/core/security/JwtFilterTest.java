@@ -149,6 +149,22 @@ class JwtFilterTest {
         assertThat(SecurityContextHolder.getContext().getAuthentication()).isNull();
     }
 
+    @Test
+    void shouldReturn401_whenRoleClaimIsNotWhitelisted() throws ServletException, IOException {
+        MockHttpServletRequest request = requestWithBearerToken("unknown-role.token");
+        MockHttpServletResponse response = new MockHttpServletResponse();
+
+        given(jwtService.isSignatureAndExpiryValid("unknown-role.token")).willReturn(true);
+        given(jwtService.extractUsername("unknown-role.token")).willReturn("alice");
+        given(jwtService.extractRole("unknown-role.token")).willReturn("ROLE_SUPER_ADMIN");
+
+        jwtFilter.doFilterInternal(request, response, filterChain);
+
+        verifyNoInteractions(filterChain);
+        assertThat(response.getStatus()).isEqualTo(401);
+        assertThat(SecurityContextHolder.getContext().getAuthentication()).isNull();
+    }
+
     private MockHttpServletRequest requestWithBearerToken(String token) {
         MockHttpServletRequest request = new MockHttpServletRequest();
         request.setServletPath("/api/v1/users/me");

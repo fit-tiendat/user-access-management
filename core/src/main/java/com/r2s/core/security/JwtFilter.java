@@ -1,5 +1,6 @@
 package com.r2s.core.security;
 
+import com.r2s.core.entity.Role;
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
@@ -77,9 +78,7 @@ public class JwtFilter extends OncePerRequestFilter {
     }
 
     private List<GrantedAuthority> authoritiesFrom(String roleClaim) {
-        String authority = roleClaim.startsWith("ROLE_")
-                ? roleClaim
-                : "ROLE_" + roleClaim;
-        return List.of(new SimpleGrantedAuthority(authority));
+        Role role = Role.valueOf(roleClaim);
+        return List.of(new SimpleGrantedAuthority(role.name()));
     }
 }
