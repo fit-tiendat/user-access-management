@@ -1,0 +1,59 @@
+name: Performance
+
+on:
+  workflow_dispatch:
+    inputs:
+      base_url:
+        description: HTTPS base URL of the deployed gateway
+        required: true
+        type: string
+      virtual_users:
+        description: Concurrent virtual users
+        required: true
+        default: "10"
+        type: string
+      duration:
+        description: Test duration, for example 2m
+        required: true
+        default: "2m"
+        type: string
+      insecure_skip_tls_verify:
+        description: Allow a local development certificate
+        required: true
+        default: false
+        type: boolean
+
+permissions:
+  contents: read
+
+jobs:
+  profile-read-load:
+    name: Profile read load test
+    runs-on: ubuntu-latest
+    environment: performance
+    env:
+      BASE_URL: ${{ inputs.base_url }}
+      PERF_VUS: ${{ inputs.virtual_users }}
+      PERF_DURATION: ${{ inputs.duration }}
+      INSECURE_SKIP_TLS_VERIFY: ${{ inputs.insecure_skip_tls_verify }}
+      K6_USERNAME: ${{ secrets.K6_USERNAME }}
+      K6_PASSWORD: ${{ secrets.K6_PASSWORD }}
+      K6_PROFILE_EMAIL: ${{ secrets.K6_PROFILE_EMAIL }}
+
+    steps:
+      - name: Checkout source
+        uses: actions/checkout@v6
+
+      - name: Run k6 thresholds
+        run: >-
+          docker run --rm
+          -e BASE_URL
+          -e PERF_VUS
+          -e PERF_DURATION
+          -e INSECURE_SKIP_TLS_VERIFY
+          -e K6_USERNAME
+          -e K6_PASSWORD
+          -e K6_PROFILE_EMAIL
+          -v "$GITHUB_WORKSPACE/performance:/scripts:ro"
+          grafana/k6:2.0.0
+          run /scripts/profile-read.js
