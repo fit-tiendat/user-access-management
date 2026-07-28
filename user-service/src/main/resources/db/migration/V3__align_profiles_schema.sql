@@ -11,7 +11,7 @@ $$;
 
 CREATE TABLE IF NOT EXISTS profiles (
     id BIGSERIAL PRIMARY KEY,
-    username VARCHAR(30) NOT NULL,
+    username VARCHAR(50) NOT NULL,
     full_name VARCHAR(100),
     email VARCHAR(100) NOT NULL,
     CONSTRAINT uk_profiles_username UNIQUE (username),
@@ -19,5 +19,12 @@ CREATE TABLE IF NOT EXISTS profiles (
 );
 
 COMMENT ON TABLE profiles IS 'User profiles keyed by the username issued by auth-service';
-COMMENT ON TABLE legacy_user_profiles IS
-    'Legacy profile schema retained for manual reconciliation after V3';
+
+DO $$
+BEGIN
+    IF to_regclass('public.legacy_user_profiles') IS NOT NULL THEN
+        COMMENT ON TABLE legacy_user_profiles IS
+            'Legacy profile schema retained for manual reconciliation after V3';
+    END IF;
+END
+$$;
