@@ -17,14 +17,3 @@ CREATE TABLE IF NOT EXISTS users (
 CREATE INDEX IF NOT EXISTS idx_users_username ON users(username);
 CREATE INDEX IF NOT EXISTS idx_users_email ON users(email);
 CREATE INDEX IF NOT EXISTS idx_users_role ON users(role);
-
--- INSERT DEFAULT ADMIN USER (password: admin123 - BCrypt encoded)
--- Note: You should change this password in production
-INSERT INTO users (username, password, role, email, full_name) 
-VALUES (
-    'admin', 
-    '$2a$10$N9qo8uLOickgx2ZMRZoMyeIjZAgcfl7p92ldGxad68LJZdL17lhWy',  -- admin123
-    'ROLE_ADMIN',
-    'admin@example.com',
-    'System Administrator'
-) ON CONFLICT (username) DO NOTHING;
