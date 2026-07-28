@@ -27,6 +27,6 @@ COPY --from=build --chown=app:app /workspace/auth-service/target/auth-service-*-
 USER app
 EXPOSE 8081
 HEALTHCHECK --interval=30s --timeout=5s --start-period=30s --retries=3 \
-    CMD curl --fail --silent http://localhost:8081/actuator/health/readiness || exit 1
+    CMD curl --fail --silent http://localhost:9081/actuator/health/readiness || exit 1
 
 ENTRYPOINT ["java", "-jar", "/app/app.jar"]
