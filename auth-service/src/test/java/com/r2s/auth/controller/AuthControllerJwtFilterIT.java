@@ -6,7 +6,6 @@ import com.r2s.auth.dto.LoginRequest;
 import com.r2s.auth.dto.RegisterRequest;
 import com.r2s.auth.service.AuthenticationService;
 import com.r2s.auth.service.RegistrationService;
-import com.r2s.core.entity.Role;
 import com.r2s.core.security.JwtFilter;
 import com.r2s.core.security.JwtService;
 import org.junit.jupiter.api.DisplayName;
@@ -90,7 +89,6 @@ class AuthControllerJwtFilterIT {
         RegisterRequest req = new RegisterRequest();
         req.setUsername("alice1");
         req.setPassword("Strong@123");
-        req.setRole(Role.ROLE_USER);
 
         mockMvc.perform(post(BASE + "/register")
                 .contentType(APPLICATION_JSON)

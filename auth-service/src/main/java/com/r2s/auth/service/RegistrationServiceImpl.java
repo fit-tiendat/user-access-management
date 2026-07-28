@@ -29,15 +29,13 @@ public class RegistrationServiceImpl implements RegistrationService {
             throw new ConflictException("Username already exists");
         }
 
-        Role role = request.getRole() != null ? request.getRole() : Role.ROLE_USER;
-
         User user = User.builder()
                 .username(username)
                 .password(passwordEncoder.encode(request.getPassword()))
-                .role(role)
+                .role(Role.ROLE_USER)
                 .build();
 
         userRepository.save(user);
-        securityAuditLogger.registrationSucceeded(username, role);
+        securityAuditLogger.registrationSucceeded(username, Role.ROLE_USER);
     }
 }

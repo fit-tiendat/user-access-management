@@ -40,7 +40,6 @@ class RegistrationServiceImplTest {
         RegisterRequest req = new RegisterRequest();
         req.setUsername("john");
         req.setPassword("1234");
-        req.setRole(null); // default ROLE_USER
 
         when(userRepository.existsByUsername("john")).thenReturn(false);
         when(passwordEncoder.encode("1234")).thenReturn("ENCODED");

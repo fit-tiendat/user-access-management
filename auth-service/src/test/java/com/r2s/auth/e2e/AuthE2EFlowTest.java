@@ -111,8 +111,7 @@ class AuthE2EFlowTest {
         given().contentType("application/json")
                 .body(Map.of(
                         "username", "bob",
-                        "password", "Another@123",
-                        "role", "ROLE_USER"
+                        "password", "Another@123"
                 ))
                 .when().post(authBase + "/register")
                 .then().statusCode(anyOf(is(400), is(409)));

@@ -49,8 +49,7 @@ class AuthServiceImplIT {
                 // given
                 RegisterRequest registerReq = new RegisterRequest(
                                 "alice_auth", // username
-                                "@P4ssw0rd", // password
-                                null // role (cho null, service tự handle)
+                                "@P4ssw0rd" // password
                 );
 
                 // when: chỉ cần gọi register, không cần giá trị trả về
@@ -73,8 +72,7 @@ class AuthServiceImplIT {
                 // given: tạo trước 1 user hợp lệ
                 RegisterRequest registerReq = new RegisterRequest(
                                 "bob_auth",
-                                "@P4ssw0rd",
-                                null);
+                                "@P4ssw0rd");
                 registrationService.register(registerReq);
 
                 // when + then: login sai password -> ném BadCredentialsException

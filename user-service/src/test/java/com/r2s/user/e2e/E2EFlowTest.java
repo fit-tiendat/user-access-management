@@ -64,7 +64,7 @@ public class E2EFlowTest {
     }
 
     static String aliceToken;
-    static String adminToken;
+    static String escalationToken;
 
     @Test
     @Order(1)
@@ -106,29 +106,30 @@ public class E2EFlowTest {
 
     @Test
     @Order(3)
-    void register_and_login_admin_then_list_and_delete() {
+    void publicRegistration_cannotEscalateRoleToAdmin() {
         given().contentType("application/json")
-                .body(Map.of("username", "admin", "password", "Admin@1234", "role", "ROLE_ADMIN"))
+                .body(Map.of(
+                        "username", "admin-candidate",
+                        "password", "Admin@1234",
+                        "role", "ROLE_ADMIN"
+                ))
                 .when().post(authBase + "/register")
                 .then().statusCode(200);
 
-        adminToken =
+        escalationToken =
                 given().contentType("application/json")
-                        .body(Map.of("username", "admin", "password", "Admin@1234"))
+                        .body(Map.of(
+                                "username", "admin-candidate",
+                                "password", "Admin@1234"
+                        ))
                         .when().post(authBase + "/login")
                         .then().statusCode(200)
                         .body("token", not(emptyString()))
                         .extract().path("token");
 
-        given().header("Authorization", "Bearer " + adminToken)
+        given().header("Authorization", "Bearer " + escalationToken)
                 .when().get(userBase)
-                .then().statusCode(200)
-                // ApiResponse wrapper
-                .body("data", notNullValue());
-
-        given().header("Authorization", "Bearer " + adminToken)
-                .when().delete(userBase + "/alice")
-                .then().statusCode(204);
+                .then().statusCode(403);
     }
 
     @Test
