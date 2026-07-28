@@ -102,7 +102,33 @@ services:
       - alertmanager_data:/alertmanager
     ports:
       - "127.0.0.1:${ALERTMANAGER_PORT:-9093}:9093"
+
+  db-backup:
+    image: postgres:16-alpine
+    cpus: "${BACKUP_CPU_LIMIT:-0.25}"
+    mem_limit: "${BACKUP_MEMORY_LIMIT:-256m}"
+    pids_limit: 100
+    restart: unless-stopped
+    environment:
+      PGHOST: postgres-db
+      PGPORT: "5432"
+      PGUSER: ${POSTGRES_USER}
+      PGPASSWORD: ${POSTGRES_PASSWORD}
+      BACKUP_DATABASES: "${AUTH_DB:-auth_service} ${USER_DB:-user_service}"
+      BACKUP_DIRECTORY: /backups
+      BACKUP_INTERVAL_SECONDS: "${BACKUP_INTERVAL_SECONDS:-86400}"
+      BACKUP_RETENTION_DAYS: "${BACKUP_RETENTION_DAYS:-14}"
+    volumes:
+      - ./operations/postgres-backup.sh:/usr/local/bin/postgres-backup.sh:ro
+      - postgres_backups:/backups
+    entrypoint:
+      - /bin/sh
+      - /usr/local/bin/postgres-backup.sh
+    depends_on:
+      postgres-db:
+        condition: service_healthy
 volumes:
   postgres_data:
   prometheus_data:
   alertmanager_data:
+  postgres_backups:
