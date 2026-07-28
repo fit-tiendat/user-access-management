@@ -1,6 +1,7 @@
 package com.r2s.user.config;
 
 import com.r2s.core.security.JwtFilter;
+import com.r2s.core.security.ApiSecurityHeaders;
 import com.r2s.core.security.audit.SecurityAuditLogger;
 import lombok.RequiredArgsConstructor;
 import org.springframework.context.annotation.Bean;
@@ -72,7 +73,7 @@ public class SecurityConfig {
                         })
                 )
 
-                .headers(h -> h.frameOptions(frame -> frame.disable()))
+                .headers(ApiSecurityHeaders.hardenedDefaults())
                 .addFilterBefore(jwtFilter, UsernamePasswordAuthenticationFilter.class)
                 .build();
     }

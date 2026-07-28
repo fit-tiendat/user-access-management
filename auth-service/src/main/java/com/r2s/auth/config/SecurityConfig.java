@@ -1,6 +1,7 @@
 package com.r2s.auth.config;
 
 import com.r2s.core.security.JwtFilter;
+import com.r2s.core.security.ApiSecurityHeaders;
 import com.r2s.core.security.audit.SecurityAuditLogger;
 import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.annotation.Value;
@@ -84,7 +85,7 @@ public class SecurityConfig {
                             res.sendError(HttpStatus.FORBIDDEN.value(), "Forbidden");
                         })
                 )
-                .headers(h -> h.frameOptions(frame -> frame.disable()))
+                .headers(ApiSecurityHeaders.hardenedDefaults())
                 .authenticationProvider(authenticationProvider())
                 .addFilterBefore(jwtFilter, UsernamePasswordAuthenticationFilter.class);
 
