@@ -45,29 +45,35 @@ public class JwtFilter extends OncePerRequestFilter {
         String token = authHeader.substring(BEARER_PREFIX.length());
 
         try {
-            if (!jwtService.isSignatureAndExpiryValid(token)) {
-                response.sendError(HttpServletResponse.SC_UNAUTHORIZED, "Invalid JWT");
-                return;
-            }
-
-            String username = requireClaim(jwtService.extractUsername(token));
-            String roleClaim = requireClaim(jwtService.extractRole(token));
-            List<GrantedAuthority> authorities = authoritiesFrom(roleClaim);
-            var authentication = new UsernamePasswordAuthenticationToken(
-                    username,
-                    null,
-                    authorities
-            );
-            authentication.setDetails(
-                    new WebAuthenticationDetailsSource().buildDetails(request)
-            );
-            SecurityContextHolder.getContext().setAuthentication(authentication);
+            establishSecurityContext(request, token);
         } catch (RuntimeException failure) {
             response.sendError(HttpServletResponse.SC_UNAUTHORIZED, "Invalid JWT");
             return;
         }
 
         filterChain.doFilter(request, response);
+    }
+
+    private void establishSecurityContext(HttpServletRequest request, String token) {
+        requireValidSignatureAndExpiry(token);
+        String username = requireClaim(jwtService.extractUsername(token));
+        String roleClaim = requireClaim(jwtService.extractRole(token));
+        List<GrantedAuthority> authorities = authoritiesFrom(roleClaim);
+        var authentication = new UsernamePasswordAuthenticationToken(
+                username,
+                null,
+                authorities
+        );
+        authentication.setDetails(
+                new WebAuthenticationDetailsSource().buildDetails(request)
+        );
+        SecurityContextHolder.getContext().setAuthentication(authentication);
+    }
+
+    private void requireValidSignatureAndExpiry(String token) {
+        if (!jwtService.isSignatureAndExpiryValid(token)) {
+            throw new IllegalArgumentException("JWT signature or expiry is invalid");
+        }
     }
 
     private String requireClaim(String claim) {
