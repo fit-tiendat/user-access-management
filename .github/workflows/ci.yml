@@ -101,9 +101,9 @@ jobs:
         env:
           PGPASSWORD: ${{ secrets.POSTGRES_PASSWORD }}
 
-      - name: Run Maven tests + HTML report (skip E2E)
+      - name: Run tests, coverage gate, and HTML report (skip E2E)
         run: |
-          mvn -B clean test surefire-report:report \
+          mvn -B clean verify surefire-report:report \
             -DfailIfNoTests=false \
             -Dsurefire.failIfNoSpecifiedTests=false \
             -Dtest='*Test,!AuthE2EFlowTest,!E2EFlowTest'
