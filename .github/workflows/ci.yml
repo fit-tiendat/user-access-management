@@ -12,14 +12,14 @@ env:
   # ==== ENV dùng chung cho job test (CI) ====
   SPRING_PROFILES_ACTIVE: docker
   POSTGRES_USER: postgres
-  POSTGRES_PASSWORD: d433221dat
+  POSTGRES_PASSWORD: ${{ secrets.POSTGRES_PASSWORD }}
   AUTH_DB: auth_service
   USER_DB: user_service
   SPRING_DATASOURCE_URL_AUTH: jdbc:postgresql://postgres-db:5432/auth_service
   SPRING_DATASOURCE_URL_USER: jdbc:postgresql://postgres-db:5432/user_service
   SPRING_DATASOURCE_USERNAME: postgres
-  SPRING_DATASOURCE_PASSWORD: d433221dat
-  JWT_SECRET: w5h2Yk1Gd3dtdkFzT0h0bTFwM05XUnJvV0V1NHVZbU5yZFRyWW9oUUNmQ1hLcw==
+  SPRING_DATASOURCE_PASSWORD: ${{ secrets.POSTGRES_PASSWORD }}
+  JWT_SECRET: ${{ secrets.JWT_SECRET }}
   JWT_EXP_MINUTES: 120
 
 # ============================================================
@@ -57,7 +57,7 @@ jobs:
         image: postgres:15
         env:
           POSTGRES_USER: postgres
-          POSTGRES_PASSWORD: d433221dat
+          POSTGRES_PASSWORD: ${{ secrets.POSTGRES_PASSWORD }}
         ports:
           - 5432:5432
         options: >-
@@ -99,7 +99,7 @@ jobs:
           psql -h localhost -p 5432 -U postgres -tc "SELECT 1 FROM pg_database WHERE datname='user_service';" | grep -q 1 || \
             psql -h localhost -p 5432 -U postgres -c "CREATE DATABASE user_service;"
         env:
-          PGPASSWORD: d433221dat
+          PGPASSWORD: ${{ secrets.POSTGRES_PASSWORD }}
 
       - name: Run Maven tests + HTML report (skip E2E)
         run: |
