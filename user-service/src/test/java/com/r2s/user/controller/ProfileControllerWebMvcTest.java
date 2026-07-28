@@ -94,6 +94,7 @@ class ProfileControllerWebMvcTest {
                 .andExpect(status().isNotFound())
                 .andExpect(content().contentTypeCompatibleWith(APPLICATION_JSON))
                 .andExpect(jsonPath("$.status").value("FAILED"))
+                .andExpect(jsonPath("$.errorCode").value("RESOURCE_NOT_FOUND"))
                 .andExpect(jsonPath("$.message").value("profile not found"));
     }
 
@@ -136,8 +137,8 @@ class ProfileControllerWebMvcTest {
                 .andExpect(status().isBadRequest())
                 .andExpect(content().contentTypeCompatibleWith(APPLICATION_JSON))
                 .andExpect(jsonPath("$.status").value("FAILED"))
-                .andExpect(jsonPath("$.message", containsString("email")))
-                .andExpect(jsonPath("$.message", containsString("must be a well-formed email address")));
+                .andExpect(jsonPath("$.errorCode").value("VALIDATION_ERROR"))
+                .andExpect(jsonPath("$.data.email", containsString("must be a well-formed email address")));
 
         verifyNoInteractions(commandService, queryService);
     }

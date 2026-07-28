@@ -3,6 +3,7 @@ package com.r2s.auth.security.ratelimit;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.github.benmanes.caffeine.cache.Cache;
 import com.github.benmanes.caffeine.cache.Caffeine;
+import com.r2s.core.dto.ApiErrorCode;
 import com.r2s.core.dto.ApiResponse;
 import io.github.bucket4j.Bucket;
 import io.github.bucket4j.ConsumptionProbe;
@@ -109,7 +110,10 @@ public class AuthRateLimitFilter extends OncePerRequestFilter {
         response.setCharacterEncoding("UTF-8");
         objectMapper.writeValue(
                 response.getWriter(),
-                ApiResponse.failed("Too many authentication attempts. Please try again later.")
+                ApiResponse.failed(
+                        ApiErrorCode.RATE_LIMIT_EXCEEDED.name(),
+                        "Too many authentication attempts. Please try again later."
+                )
         );
     }
 

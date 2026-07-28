@@ -27,7 +27,6 @@ import org.testcontainers.containers.PostgreSQLContainer;
 import org.testcontainers.junit.jupiter.Container;
 import org.testcontainers.junit.jupiter.Testcontainers;
 
-import static org.hamcrest.Matchers.containsString;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.BDDMockito.given;
 import static org.mockito.Mockito.verify;
@@ -116,7 +115,8 @@ class AuthControllerJwtFilterIT {
                 .contentType(APPLICATION_JSON)
                 .content(json))
                 .andExpect(status().isBadRequest())
-                .andExpect(jsonPath("$.username").exists());
+                .andExpect(jsonPath("$.errorCode").value("VALIDATION_ERROR"))
+                .andExpect(jsonPath("$.data.username").exists());
 
         verifyNoInteractions(registrationService);
     }
@@ -155,7 +155,8 @@ class AuthControllerJwtFilterIT {
                 .contentType(APPLICATION_JSON)
                 .content(objectMapper.writeValueAsString(req)))
                 .andExpect(status().isUnauthorized())
-                .andExpect(content().string(containsString("Invalid username or password")));
+                .andExpect(jsonPath("$.errorCode").value("UNAUTHORIZED"))
+                .andExpect(jsonPath("$.message").value("Invalid username or password"));
     }
 
     // ===== test BỔ SUNG cho admin-only / quyền =====
